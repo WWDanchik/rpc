@@ -1,126 +1,123 @@
-# @yourusername/rpc
+# @WWDanchik/rpc
 
-Простая TypeScript библиотека для RPC вызовов.
+Современная TypeScript RPC библиотека с автокомплитом и валидацией как в Redux Toolkit.
 
 ## Установка
 
 ```bash
-npm install @yourusername/rpc
+npm install @WWDanchik/rpc
 ```
 
-## Использование
+## ✨ Ключевые возможности
 
-### Базовое использование
+- 🎯 **Автокомплит полей** - IDE знает все поля из Zod схем
+- ⚡ **Автоматический вывод типов** - как в Redux Toolkit  
+- 🛡️ **Валидация Zod** - данные всегда корректны
+- 🔗 **Связи между сущностями** - hasMany, belongsTo
+
+
+## Быстрый старт
 
 ```typescript
-import { createRPCClient } from '@yourusername/rpc';
+import { Rpc, createRpcRepository, setupRepository, z } from '@yourusername/rpc';
 
-// Создание клиента с настройками
-const client = createRPCClient({
-  timeout: 10000, // 10 секунд
-  retries: 3      // количество повторов
+// 1. Создаем схемы
+const userSchema = z.object({
+  id: z.string(),
+  name: z.string().min(2),
+  email: z.string().email(),
+  age: z.number().min(18).optional()
 });
 
-// Вызов метода
-const result = await client.call('getUserInfo', userId);
-console.log(result);
-```
+// 2. Создаем RPC
+const userRpc = new Rpc('user', userSchema);
 
-### Использование класса напрямую
+// 3. Создаем repository
+const repository = setupRepository(
+  createRpcRepository()
+    .registerRpc('user', userRpc)
+);
 
-```typescript
-import { RPCClient } from '@yourusername/rpc';
+// 4. Автоматический вывод типов!
+export type AppRepositoryState = RepositoryState<typeof repository>;
 
-const client = new RPCClient({
-  timeout: 5000,
-  retries: 2
+// 5. Используем с автокомплитом!
+repository.save('user', 'user-1', {
+  name: 'John',           // ← автокомплит полей!
+  email: 'john@email.com' // ← валидация Zod!
 });
 
-const result = await client.call('methodName', param1, param2);
+// ✨ Или сохраняем массив пользователей!
+repository.saveMany('user', [
+  { id: 'user-1', name: 'John', email: 'john@email.com' },
+  { id: 'user-2', name: 'Jane', email: 'jane@email.com' }
+]);
+
+const users = repository.findBy('user', 'name', 'John'); // ← автокомплит 'name'!
 ```
 
-### Работа с типами
+## 🎯 Полное API
+
+### Создание Repository
 
 ```typescript
-import { RPCOptions, RPCRequest, RPCResponse } from '@yourusername/rpc';
+import { createRpcRepository, setupRepository } from '@yourusername/rpc';
 
-const options: RPCOptions = {
-  timeout: 8000,
-  retries: 1
-};
+const repository = setupRepository(
+  createRpcRepository()
+    .registerRpc('user', userRpc)
+    .registerRpc('post', postRpc)
+);
+
+// Автоматический вывод типов как в Redux Toolkit!
+export type AppRepositoryState = RepositoryState<typeof repository>;
 ```
 
-## API
+### CRUD операции с автокомплитом
 
-### `createRPCClient(options?: RPCOptions): RPCClient`
+```typescript
+// ✨ Сохранение одной записи
+repository.save(type, id, data);
 
-Создает новый экземпляр RPC клиента.
+// ✨ Сохранение массива записей
+repository.saveMany(type, [
+    { id: 'user-1', name: 'John', email: 'john@email.com' },
+    { id: 'user-2', name: 'Jane', email: 'jane@email.com' }
+]);
 
-### `RPCClient`
+// ✨ Поиск с автокомплитом полей
+repository.findAll(type);
+repository.findById(type, id);  
+repository.findBy(type, field, value);    // ← field автокомплит!
 
-#### Методы
-
-- `call(method: string, ...params: any[]): Promise<any>` - Выполняет RPC вызов
-
-#### Опции (`RPCOptions`)
-
-- `timeout?: number` - Таймаут в миллисекундах (по умолчанию: 5000)
-- `retries?: number` - Количество повторов (по умолчанию: 3)
-
-### Утилиты
-
-- `isRPCError(response: RPCResponse): boolean` - Проверяет, содержит ли ответ ошибку
-- `parseRPCResponse(data: string): RPCResponse` - Парсит строку в RPC ответ
-
-## Разработка
-
-### Сборка
-
-```bash
-npm run build:lib
+// ✨ Обновление и удаление
+repository.update(type, id, updates);
+repository.remove(type, id);
 ```
 
-### Запуск примера
+### Утилиты с автокомплитом
 
-```bash
-npm run build:lib
-node example.js
+```typescript
+// ✨ Группировка по полю
+repository.groupBy(type, field);          // ← field автокомплит!
+
+// ✨ Сортировка по полю  
+repository.sortBy(type, field, order);    // ← field автокомплит!
+
+// ✨ Статистика
+repository.getStats();
 ```
 
-## Публикация в npm
+### Связи между сущностями
 
-Перед публикацией:
+```typescript
+// Определение связей
+repository.defineRelation('user', 'post').hasMany('userId', 'id');
+repository.defineRelation('post', 'user').belongsTo('userId', 'id');
 
-1. **Обновите информацию в package.json:**
-   ```json
-   {
-     "name": "@your-npm-username/rpc", // ваше имя пользователя npm
-     "author": "Your Name",
-     "repository": {
-       "type": "git",
-       "url": "https://github.com/yourusername/rpc.git"
-     }
-   }
-   ```
+// Получение связанных данных
+const userPosts = repository.getRelated('user', 'user-1', 'post');
+```
 
-2. **Войдите в npm:**
-   ```bash
-   npm login
-   ```
 
-3. **Опубликуйте пакет:**
-   ```bash
-   npm publish --access public
-   ```
 
-4. **Для обновления версии:**
-   ```bash
-   npm version patch  # для патча (1.0.0 -> 1.0.1)
-   npm version minor  # для минора (1.0.0 -> 1.1.0)  
-   npm version major  # для мажора (1.0.0 -> 2.0.0)
-   npm publish
-   ```
-
-## Лицензия
-
-MIT 

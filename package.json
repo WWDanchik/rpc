@@ -1,5 +1,5 @@
 {
-    "name": "@yourusername/rpc",
+    "name": "@little-danchik/rpc",
     "version": "1.0.0",
     "description": "A TypeScript RPC library",
     "type": "module",
@@ -26,10 +26,14 @@
         "typescript",
         "library"
     ],
-    "author": "Your Name",
+    "author": "Daniyar",
     "license": "MIT",
     "devDependencies": {
+        "@types/node": "^24.1.0",
         "typescript": "~5.8.3",
         "vite": "^7.0.4"
+    },
+    "dependencies": {
+        "zod": "^4.0.13"
     }
 }
