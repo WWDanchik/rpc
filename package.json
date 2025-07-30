@@ -1,16 +1,31 @@
 {
-    "name": "@little-danchik/rpc",
+    "name": "@yunu-lab/rpc",
     "version": "1.0.0",
     "description": "A TypeScript RPC library",
+    "keywords": [
+        "rpc",
+        "typescript",
+        "library"
+    ],
+    "homepage": "https://github.com/WWDanchik/rpc#readme",
+    "bugs": {
+        "url": "https://github.com/WWDanchik/rpc/issues"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/WWDanchik/rpc.git"
+    },
+    "license": "MIT",
+    "author": "Daniyar",
     "type": "module",
-    "main": "./dist/index.js",
-    "types": "./dist/index.d.ts",
     "exports": {
         ".": {
             "types": "./dist/index.d.ts",
             "import": "./dist/index.js"
         }
     },
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
     "files": [
         "dist"
     ],
@@ -21,19 +36,12 @@
         "preview": "vite preview",
         "prepublishOnly": "npm run build:lib"
     },
-    "keywords": [
-        "rpc",
-        "typescript",
-        "library"
-    ],
-    "author": "Daniyar",
-    "license": "MIT",
+    "dependencies": {
+        "zod": "^4.0.13"
+    },
     "devDependencies": {
         "@types/node": "^24.1.0",
         "typescript": "~5.8.3",
         "vite": "^7.0.4"
-    },
-    "dependencies": {
-        "zod": "^4.0.13"
     }
 }

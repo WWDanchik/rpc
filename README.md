@@ -1,11 +1,11 @@
-# @WWDanchik/rpc
+# @yunu-lab/rpc
 
-Современная TypeScript RPC библиотека с автокомплитом и валидацией как в Redux Toolkit.
+Современная TypeScript RPC библиотека с автокомплитом и валидацией .
 
 ## Установка
 
 ```bash
-npm install @WWDanchik/rpc
+npm install @yunu-lab/rpc
 ```
 
 ## ✨ Ключевые возможности
