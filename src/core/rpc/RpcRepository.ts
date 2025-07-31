@@ -12,21 +12,15 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
     public registerRpc<TName extends string, TRpc extends Rpc<any>>(
         name: TName,
         rpc: TRpc,
-        loadCallback?: LoadCallback<TRpc extends Rpc<infer S> ? z.infer<S> : never>
+        loadCallback?: LoadCallback<
+            TRpc extends Rpc<infer S> ? z.infer<S> : never
+        >
     ): RpcRepository<TTypes & { [K in TName]: TRpc }> {
         this.rpcs.set(name, rpc);
         this.data.set(name, new Map());
         if (loadCallback) {
             this.loadCallbacks.set(name, loadCallback);
         }
-        return this;
-    }
-
-    public registerLoadCallback<T extends keyof TTypes>(
-        type: T,
-        callback: LoadCallback<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never>
-    ): this {
-        this.loadCallbacks.set(String(type), callback);
         return this;
     }
 
@@ -55,8 +49,6 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
             : never);
 
         const validatedData = rpc.validate({ ...data });
-
-
 
         const typeData = this.data.get(type as string) || new Map();
         typeData.set(String(data[foreignKey]), validatedData);
@@ -99,9 +91,7 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
                 type,
                 target as Record<
                     string,
-                    TTypes[T] extends Rpc<infer S>
-                        ? z.infer<S>
-                        : never | null
+                    TTypes[T] extends Rpc<infer S> ? z.infer<S> : never | null
                 >,
                 idFieldMap
             );
@@ -144,18 +134,16 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
     ): Promise<(TTypes[T] extends Rpc<infer S> ? z.infer<S> : never) | null> {
         const existing = await this.findById(type, id);
         if (!existing) return null;
-        
-        const updatedRecord = { ...existing, ...data };
-        
 
-        
+        const updatedRecord = { ...existing, ...data };
+
         const rpc = this.getRpc(type);
         const validatedData = rpc.validate(updatedRecord);
-        
+
         const typeData = this.data.get(type as string) || new Map();
         typeData.set(String(id), validatedData);
         this.data.set(type as string, typeData);
-        
+
         return validatedData;
     }
 
@@ -198,7 +186,9 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
             Partial<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never>
         >
     ): Array<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never> {
-        const savedRecords: Array<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never> = [];
+        const savedRecords: Array<
+            TTypes[T] extends Rpc<infer S> ? z.infer<S> : never
+        > = [];
 
         for (const record of records) {
             const savedRecord = this.save(type, record);
@@ -215,26 +205,28 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
         return Array.from(typeData.values());
     }
 
-    public async findById<T extends keyof TTypes>(
+        public findById<T extends keyof TTypes>(
         type: T,
         id: string | number
-    ): Promise<(TTypes[T] extends Rpc<infer S> ? z.infer<S> : never) | null> {
+    ): (TTypes[T] extends Rpc<infer S> ? z.infer<S> : never) | null {
         const typeData = this.data.get(type as string) || new Map();
         let result = typeData.get(String(id)) || null;
         
-        // Если данные не найдены и есть callback для загрузки
+        // Если данные не найдены и есть callback для загрузки - загружаем в фоне
         if (!result) {
             const loadCallback = this.loadCallbacks.get(String(type));
             if (loadCallback) {
-                try {
-                    result = await loadCallback(id);
-                    if (result) {
-                        // Сохраняем загруженные данные
-                        this.save(type, result);
+                // Загружаем в фоне без await
+                loadCallback(id).then((loadedData) => {
+                    if (loadedData) {
+                        this.save(type, loadedData);
                     }
-                } catch (error) {
-                    console.warn(`Failed to load data for ${String(type)} with id ${id}:`, error);
-                }
+                }).catch((error) => {
+                    console.warn(
+                        `Failed to load data for ${String(type)} with id ${id}:`,
+                        error
+                    );
+                });
             }
         }
         
@@ -304,19 +296,15 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
         };
     }
 
-    public async getRelated<
+    public getRelated<
         TSource extends keyof TTypes,
         TTarget extends keyof TTypes
     >(
         sourceType: TSource,
         sourceId: string | number,
         targetType: TTarget
-    ): Promise<
-        | Array<TTypes[TTarget] extends Rpc<infer S> ? z.infer<S> : never>
-        | (TTypes[TTarget] extends Rpc<infer S> ? z.infer<S> : never)
-        | null
-    > {
-        const sourceRecord = await this.findById(sourceType, sourceId);
+    ): Array<TTypes[TTarget] extends Rpc<infer S> ? z.infer<S> : never> {
+        const sourceRecord = this.findById(sourceType, sourceId);
         if (!sourceRecord) return [];
 
         const sourceRpc = this.getRpc(sourceType);
@@ -334,7 +322,8 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
             const foreignKeyValue = (sourceRecord as any)[
                 relation.localKey as string
             ];
-            return await this.findById(targetType, foreignKeyValue);
+            const result = this.findById(targetType, foreignKeyValue);
+            return result ? [result] : [];
         }
     }
 
