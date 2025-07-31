@@ -164,46 +164,6 @@ export type ArrayFieldsRecord<T> = {
     [K in RpcArrayPaths<T>]: ArrayElementFields<GetArrayByPath<T, K>>;
 };
 
-// Example interface for type demonstrations
-// interface User {
-//     id: number;
-//     name: string;
-//     post: {
-//         id: string;
-//         title: string;
-//         content: string;
-//         author: {
-//             id: number;
-//             name: string;
-//         };
-//     }[];
-//     profile: {
-//         bio: string;
-//         age: number;
-//         hobbies: { name: string; level: number }[];
-//         settings: {
-//             notifications: {
-//                 types: { id: string; enabled: boolean }[];
-//             };
-//         };
-//     };
-//     comments: {
-//         text: string;
-//         likes: number;
-//         replies: {
-//             text: string;
-//             author: string;
-//             likes: {
-//                 id: number;
-//                 users: {
-//                     id: number;
-//                     name: string;
-//                 }[];
-//             }[];
-//         }[];
-//     }[];
-// }
-
 export type RelationKey<
     TTypes extends Record<string, Rpc<any>>,
     TSource extends keyof TTypes,
@@ -219,25 +179,6 @@ export type RelationKey<
         : never;
 };
 
-// type PostArray = GetArrayByPath<User, "post">;
-// type HobbiesArray = GetArrayByPath<User, "profile.hobbies">;
-// type RepliesArray = GetArrayByPath<User, "comments.replies">;
-// type RepliesLikesArray = GetArrayByPath<User, "comments.replies.likes">;
-// type RepliesLikesUsersArray = GetArrayByPath<
-//     User,
-//     "comments.replies.likes.users"
-// >;
-
-// Example usage:
-// const a: ArrayFieldsRecord<User> = {
-//     post: "id",
-//     "comments.replies": "text",
-//     "comments.replies.likes.users": "id",
-//     "comments.replies.likes": "id",
-//     comments: "text",
-// };
-
-// Типы для конфигурации полей ID
 export type IdFieldMap = {
     [path: string]:
         | string
@@ -248,5 +189,4 @@ export type IdFieldMap = {
           };
 };
 
-// Типы для callback'ов
 export type LoadCallback<T> = (id: string | number) => Promise<T | null>;

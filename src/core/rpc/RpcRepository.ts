@@ -72,21 +72,18 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
         const rpc = this.getRpc(type);
         const mergePath = rpc.getMergePath();
 
-        // Преобразуем mergePath в IdFieldMap
         const idFieldMap: IdFieldMap = {};
         for (const [path, idField] of Object.entries(mergePath)) {
             idFieldMap[path] = idField;
         }
 
         if (Array.isArray(target)) {
-            // Слияние с массивом
             return this.mergeArrayDeep(
                 type,
                 this.arrayToRecord(type, target),
                 idFieldMap
             );
         } else if (typeof target === "object" && target !== null) {
-            // Это Record<string, Partial<...>>
             return this.mergeArrayDeep(
                 type,
                 target as Record<
@@ -147,39 +144,6 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
         return validatedData;
     }
 
-    public updateByPath<T extends keyof TTypes>(
-        type: T,
-        id: string | number,
-        path: string,
-        value: any
-    ): (TTypes[T] extends Rpc<infer S> ? z.infer<S> : never) | null {
-        const existing = this.findById(type, id);
-        if (!existing) return null;
-
-        const updated = { ...existing };
-        this.setRpcPathValue(updated, path, value);
-
-        const rpc = this.getRpc(type);
-        const validatedData = rpc.validate(updated);
-
-        const typeData = this.data.get(type as string) || new Map();
-        typeData.set(String(id), validatedData);
-        this.data.set(type as string, typeData);
-
-        return validatedData;
-    }
-
-    public getByPath<T extends keyof TTypes>(
-        type: T,
-        id: string | number,
-        path: string
-    ): any {
-        const record = this.findById(type, id);
-        if (!record) return undefined;
-
-        return this.getRpcPathValue(record, path);
-    }
-
     public saveMany<T extends keyof TTypes>(
         type: T,
         records: Array<
@@ -205,31 +169,33 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
         return Array.from(typeData.values());
     }
 
-        public findById<T extends keyof TTypes>(
+    public findById<T extends keyof TTypes>(
         type: T,
         id: string | number
     ): (TTypes[T] extends Rpc<infer S> ? z.infer<S> : never) | null {
         const typeData = this.data.get(type as string) || new Map();
         let result = typeData.get(String(id)) || null;
-        
-        // Если данные не найдены и есть callback для загрузки - загружаем в фоне
+
         if (!result) {
             const loadCallback = this.loadCallbacks.get(String(type));
             if (loadCallback) {
-                // Загружаем в фоне без await
-                loadCallback(id).then((loadedData) => {
-                    if (loadedData) {
-                        this.save(type, loadedData);
-                    }
-                }).catch((error) => {
-                    console.warn(
-                        `Failed to load data for ${String(type)} with id ${id}:`,
-                        error
-                    );
-                });
+                loadCallback(id)
+                    .then((loadedData) => {
+                        if (loadedData) {
+                            this.save(type, loadedData);
+                        }
+                    })
+                    .catch((error) => {
+                        console.warn(
+                            `Failed to load data for ${String(
+                                type
+                            )} with id ${id}:`,
+                            error
+                        );
+                    });
             }
         }
-        
+
         return result;
     }
 
@@ -673,25 +639,7 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
         return result;
     }
 
-    private getRpcPathValue(obj: any, path: string): any {
-        return path.split(".").reduce((current, key) => {
-            return current && current[key] !== undefined
-                ? current[key]
-                : undefined;
-        }, obj);
-    }
 
-    private setRpcPathValue(obj: any, path: string, value: any): void {
-        const keys = path.split(".");
-        const lastKey = keys.pop()!;
-        const target = keys.reduce((current, key) => {
-            if (!current[key] || typeof current[key] !== "object") {
-                current[key] = {};
-            }
-            return current[key];
-        }, obj);
-        target[lastKey] = value;
-    }
 
     private mergeArrayDeep<T extends keyof TTypes>(
         type: T,
