@@ -1,13 +1,12 @@
 # @yunu-lab/rpc-ts
 
-Современная TypeScript RPC библиотека с автокомплитом и валидацией.
+TypeScript библиотека для работы с Remote Procedure Call (RPC) с поддержкой Zod схем, связей между типами и глубокого слияния данных.
 
 ## Установка
 
 ```bash
 npm install @yunu-lab/rpc-ts
 ```
-
 ## ✨ Ключевые возможности
 
 - 🎯 **Автокомплит полей** - IDE знает все поля из Zod схем
@@ -17,254 +16,451 @@ npm install @yunu-lab/rpc-ts
 - 🔄 **Глубокое слияние данных** - mergeRpc с поддержкой путей
 - 📍 **Работа с путями** - updateByPath, getByPath
 - 🎛️ **Продвинутые типы** - ArrayElementFields, RelationKey, ArrayFieldsRecord
+- 📡 **Асинхронные callback'и** - load, save, update, delete для каждого типа
 
 ## Быстрый старт
 
 ```typescript
-import { Rpc, RpcRepository, z } from '@yunu-lab/rpc-ts';
+import z from "zod";
+import { Rpc, RpcRepository } from "@yunu-lab/rpc-ts";
 
-// 1. Создаем схемы
-const cellSchema = z.object({
-    cell_id: z.number(),
-    cell_name: z.string(),
-    cell_value: z.string(),
-    is_stretched: z.boolean(),
-    products_ids: z.array(z.object({ id: z.number() })),
-});
-
-const rectangleSchema = z.object({
+// 1. Определяем схемы данных
+const userSchema = z.object({
     id: z.number(),
-    cell_ids: z.array(z.object({ id: z.number() })),
-    map_cells: z.record(z.string(), z.object({
-        id: z.number(),
-        type: z.enum(["box", "pallet"]),
-        parent: z.object({ id: z.number(), code: z.string() }).optional(),
-    })),
-});
-
-const productSchema = z.object({
-    id: z.number(),
-    article: z.string(),
     name: z.string(),
-    gravatar: z.string(),
-    barcode_ids: z.array(z.object({ id: z.number() })),
-    is_stretched: z.boolean(),
+    email: z.string(),
+    posts: z.array(z.object({ id: z.number(), title: z.string() })),
 });
 
-// 2. Создаем RPC с конфигурацией путей для слияния
-const cellRpc = new Rpc("cell", cellSchema, "cell_id", {
-    products_ids: "id",
+const postSchema = z.object({
+    id: z.number(),
+    title: z.string(),
+    content: z.string(),
+    author_id: z.number(),
 });
 
-const rectangleRpc = new Rpc("rectangle", rectangleSchema, "id", {
-    cell_ids: "id",
+// 2. Создаем RPC типы
+const userRpc = new Rpc("user", userSchema, "id", {
+    posts: "id",
 });
+const postRpc = new Rpc("post", postSchema, "id", {});
 
-const productRpc = new Rpc("product", productSchema, "id", {
-    barcode_ids: "id",
-});
-
-// 3. Создаем repository с callback'ами для загрузки данных
+// 3. Создаем repository с callback для загрузки данных
 const rpcRepository = new RpcRepository()
-    .registerRpc("cell", cellRpc)
-    .registerRpc("product", productRpc, async (id) => {
-        // Загружаем данные продукта с сервера
-        const response = await fetch(`/api/products/${id}`);
+    .registerRpc("user", userRpc)
+    .registerRpc("post", postRpc, async (id) => {
+        // Загружаем данные с сервера если их нет локально
+        const response = await fetch(`/api/posts/${id}`);
         return response.json();
-    })
-    .registerRpc("rectangle", rectangleRpc);
+    });
 
-// 4. Определяем связи между сущностями
-rpcRepository.defineRelation("rectangle", "cell").hasMany(
-    { field: "cell_ids", key: "id" },
-    "cell_id"
-);
-
-rpcRepository.defineRelation("cell", "product").hasMany(
-    { field: "products_ids", key: "id" },
+// 4. Определяем связи между типами
+rpcRepository.defineRelation("user", "post").hasMany(
+    { field: "posts", key: "id" },
     "id"
 );
 
 // 5. Сохраняем данные
-rpcRepository.save("product", {
+rpcRepository.save("user", {
     id: 1,
-    article: "ART001",
-    name: "Товар 1",
-    gravatar: "https://example.com/img1.jpg",
-    barcode_ids: [{ id: 1001 }, { id: 1002 }],
-    is_stretched: false,
+    name: "John Doe",
+    email: "john@example.com",
+    posts: [{ id: 1, title: "First Post" }],
 });
 
-rpcRepository.save("cell", {
-    cell_id: 1,
-    cell_name: "Ячейка A1",
-    cell_value: "CELL_000222222",
-    is_stretched: true,
-    products_ids: [{ id: 1 }, { id: 2 }],
-});
-
-rpcRepository.save("rectangle", {
-    id: 1,
-    cell_ids: [{ id: 1 }, { id: 2 }],
-    map_cells: {
-        pos_1_1: { id: 101, type: "pallet" },
-        pos_1_2: { id: 102, type: "box", parent: { id: 101, code: "pos_1_1" } },
-    },
-});
+// 6. Получаем данные
+const user = await rpcRepository.findById("user", 1);
+const userPosts = await rpcRepository.getRelated("user", 1, "post");
 ```
 
-## 🎯 Полное API
+## CRUD операции
 
-### CRUD операции с автокомплитом
-
-```typescript
-// ✨ Сохранение одной записи
-rpcRepository.save("product", {
-    id: 2,
-    article: "ART002",
-    name: "Товар 2",
-    gravatar: "https://example.com/img2.jpg",
-    barcode_ids: [{ id: 2001 }, { id: 2002 }],
-    is_stretched: true,
-});
-
-// ✨ Сохранение массива записей
-rpcRepository.saveMany("product", [
-    { id: 3, article: "ART003", name: "Товар 3", /* ... */ },
-    { id: 4, article: "ART004", name: "Товар 4", /* ... */ }
-]);
-
-// ✨ Поиск с автокомплитом полей
-const allProducts = rpcRepository.findAll("product");
-const product = rpcRepository.findById("product", 1);
-const productsByName = rpcRepository.findBy("product", "name", "Товар 1");
-
-// ✨ Обновление и удаление
-rpcRepository.remove("product", 1);
-```
-
-### 🔄 Глубокое слияние данных
+### Сохранение данных
 
 ```typescript
-// Слияние с Record<string, Partial<...>> - обновление конкретных записей по ID
-rpcRepository.mergeRpc("product", existingProducts, {
-    "1": { article: "ART001_UPDATED", name: "Новое имя" },
-    "2": { is_stretched: true },
-    "3": null, // удаление записи
+// Сохранение одного элемента
+rpcRepository.save("user", {
+    id: 1,
+    name: "John Doe",
+    email: "john@example.com",
+    posts: [{ id: 1, title: "First Post" }],
 });
 
-// Слияние с массивом - добавление новых записей
-rpcRepository.mergeRpc("product", existingProducts, [
-    { id: 5, article: "ART005", name: "Новый товар" },
-    { id: 6, article: "ART006", name: "Еще один товар" }
+// Сохранение нескольких элементов
+rpcRepository.saveMany("user", [
+    { id: 1, name: "John", email: "john@example.com", posts: [] },
+    { id: 2, name: "Jane", email: "jane@example.com", posts: [] },
 ]);
 ```
 
-
-
-### 🔗 Связи между сущностями
+### Получение данных
 
 ```typescript
-// Получение связанных данных
-const rectangleCells = await rpcRepository.getRelated("rectangle", 1, "cell");
-const cellProducts = await rpcRepository.getRelated("cell", 1, "product");
+// Поиск по ID
+const user = rpcRepository.findById("user", 1);
 
-// Теперь при вызове findById, если данных нет локально, 
-// они будут автоматически загружены через callback
-const product = await rpcRepository.findById("product", 123);
+// Поиск всех элементов
+const allUsers = rpcRepository.findAll("user");
+
+// Поиск по условию
+const users = rpcRepository.findBy("user", (user) => user.name.includes("John"));
 ```
 
-### 🎛️ Продвинутые типы
+### Обновление данных
 
 ```typescript
-import { ArrayElementFields, RelationKey, ArrayFieldsRecord } from '@yunu-lab/rpc-ts';
+// Обновление по ID
+rpcRepository.update("user", 1, { name: "John Updated" });
 
-// ArrayElementFields - извлекает поля элементов массива
-type ProductFields = ArrayElementFields<Product[]>; // "id" | "article" | "name" | ...
-
-// RelationKey - типизированная связь между сущностями
-type CellProductRelation = RelationKey<
-    typeof rpcRepository,
-    "cell",
-    "products_ids"
->;
-
-// ArrayFieldsRecord - карта путей к массивам и их полей
-type RectangleArrayFields = ArrayFieldsRecord<Rectangle>;
-// {
-//   cell_ids: "id";
-//   map_cells: "id" | "type" | "parent";
-// }
+// Обновление по условию
+rpcRepository.updateBy("user", (user) => user.name === "John", { name: "John Updated" });
 ```
 
-### Утилиты с автокомплитом
+### Удаление данных
 
 ```typescript
-// ✨ Группировка по полю
-const productsByStretch = rpcRepository.groupBy("product", "is_stretched");
+// Удаление по ID
+rpcRepository.delete("user", 1);
 
-// ✨ Сортировка по полю  
-const sortedProducts = rpcRepository.sortBy("product", "article", "asc");
-
-// ✨ Статистика
-const stats = rpcRepository.getStats();
-// { product: { count: 2, ids: ["1", "2"] }, cell: { count: 1, ids: ["1"] } }
-
-// ✨ Состояние репозитория
-const state = rpcRepository.getState();
-// { product: { byId: {...}, allIds: [...] }, cell: { byId: {...}, allIds: [...] } }
+// Удаление по условию
+rpcRepository.deleteBy("user", (user) => user.name === "John");
 ```
 
-## 🏗️ Архитектура
+## Связи между типами
 
-### Rpc класс
+### hasMany (один ко многим)
+
 ```typescript
-const rpc = new Rpc(
-    "product",           // тип сущности
-    productSchema,       // Zod схема
-    "id",               // поле ID
-    { barcode_ids: "id" } // конфигурация путей для слияния
+rpcRepository.defineRelation("user", "post").hasMany(
+    { field: "posts", key: "id" },
+    "id"
 );
+
+// Получение связанных данных
+const userPosts = rpcRepository.getRelated("user", 1, "post");
 ```
 
-### RpcRepository класс
+### belongsTo (многие к одному)
+
 ```typescript
-const repository = new RpcRepository()
-    .registerRpc("product", productRpc)
-    .registerRpc("cell", cellRpc);
+rpcRepository.defineRelation("post", "user").belongsTo(
+    { field: "author_id", key: "id" },
+    "id"
+);
+
+// Получение связанных данных
+const postAuthor = rpcRepository.getRelated("post", 1, "user");
 ```
 
-## 🎯 Типы для экспорта
+## Глубокое слияние данных
+
+### mergeRpc метод
 
 ```typescript
-export type Cell = z.infer<typeof cellSchema>;
-export type Rectangle = z.infer<typeof rectangleSchema>;
-export type Product = z.infer<typeof productSchema>;
+// Слияние с массивом новых записей
+const updatedUsers = rpcRepository.mergeRpc("user", existingUsers, [
+    { id: 1, name: "John Updated", email: "john@example.com", posts: [] },
+    { id: 3, name: "New User", email: "new@example.com", posts: [] },
+]);
 
-// Типы с расширенными данными
-type CellWithProducts = Cell & {
-    products: Product[];
+// Слияние с объектом обновлений
+const updatedUsers = rpcRepository.mergeRpc("user", existingUsers, {
+    "1": { name: "John Updated" },
+    "2": null, // удаление записи
+    "3": { id: 3, name: "New User", email: "new@example.com", posts: [] },
+});
+```
+
+## Асинхронная загрузка данных
+
+### Когда использовать?
+
+**Проблема:** В реальных приложениях данные часто хранятся на сервере, но не все данные нужны сразу. Загрузка всех данных при инициализации приложения может быть медленной и неэффективной.
+
+**Примеры проблем:**
+```typescript
+// ❌ Плохо: Загружаем все данные сразу
+const allUsers = await fetch('/api/users'); // 1000+ записей
+const allPosts = await fetch('/api/posts'); // 5000+ записей
+const allComments = await fetch('/api/comments'); // 10000+ записей
+
+// ❌ Плохо: Ручная проверка наличия данных
+const user = users.find(u => u.id === 123);
+if (!user) {
+    const response = await fetch(`/api/users/123`);
+    const newUser = await response.json();
+    users.push(newUser);
+}
+
+// ❌ Плохо: Дублирование логики загрузки
+const getUser = async (id) => {
+    const response = await fetch(`/api/users/${id}`);
+    return response.json();
 };
-
-type RectangleWithData = Rectangle & {
-    cells: CellWithProducts[];
+const getPost = async (id) => {
+    const response = await fetch(`/api/posts/${id}`);
+    return response.json();
 };
 ```
 
-## 📦 Экспорты
-
+**Решение с @yunu-lab/rpc-ts:**
 ```typescript
-import {
-    Rpc,
-    RpcRepository,
-    ArrayElementFields,
-    RelationKey,
-    ArrayFieldsRecord,
-    IdFieldMap,
-    createRpcRepository,
-    setupRepository
-} from '@yunu-lab/rpc-ts';
+// ✅ Хорошо: Ленивая загрузка только нужных данных
+const rpcRepository = new RpcRepository()
+    .registerRpc("user", userRpc, async (id) => {
+        const response = await fetch(`/api/users/${id}`);
+        return response.json();
+    })
+    .registerRpc("post", postRpc, async (id) => {
+        const response = await fetch(`/api/posts/${id}`);
+        return response.json();
+    });
+
+// Данные загружаются автоматически только когда нужны
+const user = await rpcRepository.findById("user", 123); // Загрузит только пользователя 123
+const userPosts = await rpcRepository.getRelated("user", 123, "post"); // Загрузит только посты пользователя 123
 ```
 
+### Регистрация callback'ов
 
+```typescript
+// При регистрации RPC типа
+rpcRepository.registerRpc("post", postRpc, async (id) => {
+    const response = await fetch(`/api/posts/${id}`);
+    return response.json();
+});
 
+// Или отдельно
+rpcRepository.registerLoadCallback("post", async (id) => {
+    const response = await fetch(`/api/posts/${id}`);
+    return response.json();
+});
+```
+
+### Как это работает
+
+```typescript
+// 1. Регистрируем callback для загрузки данных
+rpcRepository.registerLoadCallback("post", async (id) => {
+    const response = await fetch(`/api/posts/${id}`);
+    return response.json();
+});
+
+// 2. При вызове findById происходит следующее:
+const post = await rpcRepository.findById("post", 123);
+// - Сначала ищет в локальном хранилище
+// - Если не найден, вызывает load callback
+// - Загруженные данные автоматически сохраняются локально
+// - Возвращает данные (из локального хранилища или с сервера)
+
+// 3. getRelated также использует load callback
+const userPosts = await rpcRepository.getRelated("user", 1, "post");
+// - Для каждого связанного ID вызывает findById
+// - Если данных нет локально, загружает через callback
+// - Возвращает полные данные со связями
+```
+
+**Преимущества:**
+- 🚀 **Ленивая загрузка** - данные загружаются только когда нужны
+- 💾 **Кэширование** - загруженные данные сохраняются локально
+- 🔄 **Автоматическая синхронизация** - callback вызывается автоматически
+- 🛡️ **Обработка ошибок** - если callback падает, возвращается null
+
+### Сценарии использования
+
+**1. E-commerce приложение:**
+```typescript
+// Пользователь просматривает каталог товаров
+const product = await rpcRepository.findById("product", 456);
+// ✅ Загрузит только товар 456, а не весь каталог
+
+// Пользователь открывает корзину
+const cartItems = await rpcRepository.getRelated("cart", 1, "product");
+// ✅ Загрузит только товары в корзине пользователя
+```
+
+**2. Социальная сеть:**
+```typescript
+// Пользователь открывает профиль друга
+const friend = await rpcRepository.findById("user", 789);
+const friendPosts = await rpcRepository.getRelated("user", 789, "post");
+// ✅ Загрузит только данные друга и его посты
+```
+
+**3. CRM система:**
+```typescript
+// Менеджер открывает карточку клиента
+const client = await rpcRepository.findById("client", 101);
+const clientOrders = await rpcRepository.getRelated("client", 101, "order");
+const clientContacts = await rpcRepository.getRelated("client", 101, "contact");
+// ✅ Загрузит только данные конкретного клиента
+```
+
+**4. Dashboard с виджетами:**
+```typescript
+// Каждый виджет загружает только свои данные
+const salesData = await rpcRepository.findById("sales", "current_month");
+const userStats = await rpcRepository.findById("stats", "users");
+const notifications = await rpcRepository.findById("notifications", "unread");
+// ✅ Каждый виджет независимо загружает нужные данные
+```
+
+### Альтернативы и почему @yunu-lab/rpc-ts лучше
+
+**React Query / TanStack Query:**
+```typescript
+// ❌ Нужно вручную управлять кэшем и ключами
+const { data: user } = useQuery(['user', id], () => fetchUser(id));
+const { data: posts } = useQuery(['posts', userId], () => fetchUserPosts(userId));
+
+// ✅ С @yunu-lab/rpc-ts: автоматическое управление
+const user = await rpcRepository.findById("user", id);
+const posts = await rpcRepository.getRelated("user", id, "post");
+```
+
+**Redux Toolkit Query:**
+```typescript
+// ❌ Сложная настройка API endpoints
+const api = createApi({
+    baseQuery: fetchBaseQuery({ baseUrl: '/api' }),
+    endpoints: (builder) => ({
+        getUser: builder.query<User, number>({
+            query: (id) => `users/${id}`,
+        }),
+        getUserPosts: builder.query<Post[], number>({
+            query: (userId) => `users/${userId}/posts`,
+        }),
+    }),
+});
+
+// ✅ С @yunu-lab/rpc-ts: простая регистрация callback'ов
+rpcRepository.registerRpc("user", userRpc, async (id) => {
+    const response = await fetch(`/api/users/${id}`);
+    return response.json();
+});
+```
+
+**SWR:**
+```typescript
+// ❌ Нужно помнить ключи и зависимости
+const { data: user } = useSWR(`/api/users/${id}`, fetcher);
+const { data: posts } = useSWR(
+    user ? `/api/users/${user.id}/posts` : null, 
+    fetcher
+);
+
+// ✅ С @yunu-lab/rpc-ts: автоматические зависимости
+const user = await rpcRepository.findById("user", id);
+const posts = await rpcRepository.getRelated("user", id, "post");
+```
+
+**Преимущества @yunu-lab/rpc-ts:**
+- 🎯 **Простота** - минимум кода для настройки
+- 🔗 **Связи** - автоматическая загрузка связанных данных
+- 🛡️ **Валидация** - встроенная валидация Zod
+- 📦 **Кэширование** - автоматическое кэширование без настройки
+- 🚀 **Производительность** - загрузка только нужных данных
+
+## Продвинутые типы
+
+### ArrayElementFields
+
+Извлекает ключи элементов массива:
+
+```typescript
+type UserPosts = ArrayElementFields<User["posts"]>; // "id" | "title"
+```
+
+### RelationKey
+
+Определяет связь между RPC типами:
+
+```typescript
+type UserPostRelation = RelationKey<RepositoryTypes, "user", "posts">;
+// { field: "posts"; key: "id" }
+```
+
+### ArrayFieldsRecord
+
+Маппинг путей к массивам на поля их элементов:
+
+```typescript
+type UserArrayFields = ArrayFieldsRecord<User>;
+// { posts: "id" | "title" }
+```
+
+## API Reference
+
+### Rpc
+
+```typescript
+class Rpc<TSchema extends z.ZodSchema> {
+    constructor(
+        type: string,
+        schema: TSchema,
+        foreignKey: keyof z.infer<TSchema>,
+        mergePath?: ArrayFieldsRecord<z.infer<TSchema>>
+    );
+    
+    getType(): string;
+    getSchema(): TSchema;
+    getForeignKey(): keyof z.infer<TSchema>;
+    getMergePath(): ArrayFieldsRecord<z.infer<TSchema>>;
+}
+```
+
+### RpcRepository
+
+```typescript
+class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
+    registerRpc<TName extends string, TRpc extends Rpc<any>>(
+        name: TName,
+        rpc: TRpc,
+        loadCallback?: LoadCallback<TRpc extends Rpc<infer S> ? z.infer<S> : never>
+    ): RpcRepository<TTypes & { [K in TName]: TRpc }>;
+    
+    registerLoadCallback<T extends keyof TTypes>(
+        type: T,
+        callback: LoadCallback<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never>
+    ): this;
+    
+    defineRelation<TSource extends keyof TTypes, TTarget extends keyof TTypes>(
+        sourceType: TSource,
+        targetType: TTarget
+    ): {
+        hasMany: <TForeignField, TLocalField>(
+            foreign: RelationKey<TTypes, TSource, TForeignField>,
+            localKey: TLocalField
+        ) => RpcRepository<TTypes>;
+        belongsTo: <TForeignField, TLocalField>(
+            foreign: RelationKey<TTypes, TSource, TForeignField>,
+            localKey: TLocalField
+        ) => RpcRepository<TTypes>;
+    };
+    
+    save<T extends keyof TTypes>(
+        type: T,
+        data: Partial<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never>
+    ): TTypes[T] extends Rpc<infer S> ? z.infer<S> : never;
+    
+    saveMany<T extends keyof TTypes>(
+        type: T,
+        records: Array<Partial<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never>>
+    ): Array<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never>;
+    
+    findById<T extends keyof TTypes>(
+        type: T,
+        id: string | number
+    ): Promise<(TTypes[T] extends Rpc<infer S> ? z.infer<S> : never) | null>;
+    
+    mergeRpc<T extends keyof TTypes>(
+        type: T,
+        source: Array<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never>,
+        target: Record<string, Partial<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never> | null> | Array<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never>
+    ): Array<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never>;
+}
+```
+
+## Лицензия
+
+MIT

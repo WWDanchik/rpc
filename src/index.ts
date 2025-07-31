@@ -18,5 +18,10 @@ export type {
 
 export { z } from "zod";
 
-// Export merge utilities
-export type { IdFieldMap } from "./core/types";
+export type { 
+    IdFieldMap,
+    ArrayElementFields,
+    RelationKey,
+    ArrayFieldsRecord,
+    LoadCallback,
+} from "./core/types";

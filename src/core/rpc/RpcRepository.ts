@@ -1,18 +1,18 @@
 import z from "zod";
-import { RelationKey, IdFieldMap } from "../types";
+import { RelationKey, IdFieldMap, LoadCallback } from "../types";
 import { Rpc } from "./Rpc";
 
 export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
     private rpcs = new Map<string, Rpc<any>>();
     private data = new Map<string, Map<string, any>>();
-    private loadCallbacks = new Map<string, (id: string | number) => Promise<any>>();
+    private loadCallbacks = new Map<string, LoadCallback<any>>();
 
     constructor() {}
 
     public registerRpc<TName extends string, TRpc extends Rpc<any>>(
         name: TName,
         rpc: TRpc,
-        loadCallback?: (id: string | number) => Promise<TRpc extends Rpc<infer S> ? z.infer<S> : never>
+        loadCallback?: LoadCallback<TRpc extends Rpc<infer S> ? z.infer<S> : never>
     ): RpcRepository<TTypes & { [K in TName]: TRpc }> {
         this.rpcs.set(name, rpc);
         this.data.set(name, new Map());
@@ -24,7 +24,7 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
 
     public registerLoadCallback<T extends keyof TTypes>(
         type: T,
-        callback: (id: string | number) => Promise<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never>
+        callback: LoadCallback<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never>
     ): this {
         this.loadCallbacks.set(String(type), callback);
         return this;
@@ -55,6 +55,8 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
             : never);
 
         const validatedData = rpc.validate({ ...data });
+
+
 
         const typeData = this.data.get(type as string) || new Map();
         typeData.set(String(data[foreignKey]), validatedData);
@@ -135,6 +137,28 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
         return record;
     }
 
+    public async update<T extends keyof TTypes>(
+        type: T,
+        id: string | number,
+        data: Partial<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never>
+    ): Promise<(TTypes[T] extends Rpc<infer S> ? z.infer<S> : never) | null> {
+        const existing = await this.findById(type, id);
+        if (!existing) return null;
+        
+        const updatedRecord = { ...existing, ...data };
+        
+
+        
+        const rpc = this.getRpc(type);
+        const validatedData = rpc.validate(updatedRecord);
+        
+        const typeData = this.data.get(type as string) || new Map();
+        typeData.set(String(id), validatedData);
+        this.data.set(type as string, typeData);
+        
+        return validatedData;
+    }
+
     public updateByPath<T extends keyof TTypes>(
         type: T,
         id: string | number,
@@ -200,10 +224,10 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
         
         // Если данные не найдены и есть callback для загрузки
         if (!result) {
-            const callback = this.loadCallbacks.get(String(type));
-            if (callback) {
+            const loadCallback = this.loadCallbacks.get(String(type));
+            if (loadCallback) {
                 try {
-                    result = await callback(id);
+                    result = await loadCallback(id);
                     if (result) {
                         // Сохраняем загруженные данные
                         this.save(type, result);

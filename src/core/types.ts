@@ -1,4 +1,4 @@
-import z, { keyof, object } from "zod";
+import z from "zod";
 import { Rpc } from "./rpc/Rpc";
 
 export type RelationType = "one-to-one" | "one-to-many" | "many-to-many";
@@ -164,44 +164,45 @@ export type ArrayFieldsRecord<T> = {
     [K in RpcArrayPaths<T>]: ArrayElementFields<GetArrayByPath<T, K>>;
 };
 
-interface User {
-    id: number;
-    name: string;
-    post: {
-        id: string;
-        title: string;
-        content: string;
-        author: {
-            id: number;
-            name: string;
-        };
-    }[];
-    profile: {
-        bio: string;
-        age: number;
-        hobbies: { name: string; level: number }[];
-        settings: {
-            notifications: {
-                types: { id: string; enabled: boolean }[];
-            };
-        };
-    };
-    comments: {
-        text: string;
-        likes: number;
-        replies: {
-            text: string;
-            author: string;
-            likes: {
-                id: number;
-                users: {
-                    id: number;
-                    name: string;
-                }[];
-            }[];
-        }[];
-    }[];
-}
+// Example interface for type demonstrations
+// interface User {
+//     id: number;
+//     name: string;
+//     post: {
+//         id: string;
+//         title: string;
+//         content: string;
+//         author: {
+//             id: number;
+//             name: string;
+//         };
+//     }[];
+//     profile: {
+//         bio: string;
+//         age: number;
+//         hobbies: { name: string; level: number }[];
+//         settings: {
+//             notifications: {
+//                 types: { id: string; enabled: boolean }[];
+//             };
+//         };
+//     };
+//     comments: {
+//         text: string;
+//         likes: number;
+//         replies: {
+//             text: string;
+//             author: string;
+//             likes: {
+//                 id: number;
+//                 users: {
+//                     id: number;
+//                     name: string;
+//                 }[];
+//             }[];
+//         }[];
+//     }[];
+// }
 
 export type RelationKey<
     TTypes extends Record<string, Rpc<any>>,
@@ -227,14 +228,14 @@ export type RelationKey<
 //     "comments.replies.likes.users"
 // >;
 
-const a: ArrayFieldsRecord<User> = {
-    post: "id",
-    "comments.replies": "text",
-    "comments.replies.likes.users": "id",
-    "comments.replies.likes": "id",
-    comments: "text",
-    
-};
+// Example usage:
+// const a: ArrayFieldsRecord<User> = {
+//     post: "id",
+//     "comments.replies": "text",
+//     "comments.replies.likes.users": "id",
+//     "comments.replies.likes": "id",
+//     comments: "text",
+// };
 
 // Типы для конфигурации полей ID
 export type IdFieldMap = {
@@ -246,3 +247,6 @@ export type IdFieldMap = {
               recursive?: boolean;
           };
 };
+
+// Типы для callback'ов
+export type LoadCallback<T> = (id: string | number) => Promise<T | null>;
