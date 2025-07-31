@@ -7,11 +7,20 @@ export class Rpc<TSchema extends z.ZodSchema = z.ZodSchema> {
     private fields: TSchema;
     private emitter: EventEmitter;
     private relations = new Map<string, TypedRpcRelation<TSchema, any>>();
-
-    constructor(type: string, fields: TSchema) {
+    private foreignKey: ZodSchemaKeys<TSchema>;
+    private mergePath: Record<string, string>;
+    constructor(
+        type: string,
+        fields: TSchema,
+        foreignKey: ZodSchemaKeys<TSchema>,
+        mergePath: Record<string, string>
+    ) {
         this.type = type;
         this.fields = fields;
         this.emitter = new EventEmitter();
+        this.foreignKey = foreignKey;
+
+        this.mergePath = mergePath;
     }
 
     public validate(data: any): ZodSchemaType<TSchema> {
@@ -39,6 +48,10 @@ export class Rpc<TSchema extends z.ZodSchema = z.ZodSchema> {
     public emit(event: Events, ...args: any[]): this {
         this.emitter.emit(event, ...args);
         return this;
+    }
+
+    public getMergePath(): Record<string, string> {
+        return this.mergePath;
     }
 
     public hasMany<TTargetSchema extends z.ZodSchema>(
@@ -96,5 +109,9 @@ export class Rpc<TSchema extends z.ZodSchema = z.ZodSchema> {
 
     public getRelations(): Map<string, TypedRpcRelation<TSchema, any>> {
         return this.relations;
+    }
+
+    public getForeignKey(): ZodSchemaKeys<TSchema> {
+        return this.foreignKey;
     }
 }

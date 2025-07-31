@@ -17,3 +17,6 @@ export type {
 } from "./core/types";
 
 export { z } from "zod";
+
+// Export merge utilities
+export type { IdFieldMap } from "./core/types";
