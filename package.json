@@ -1,6 +1,6 @@
 {
     "name": "@yunu-lab/rpc-ts",
-    "version": "1.2.2",
+    "version": "1.2.3",
     "description": "A TypeScript RPC library",
     "keywords": [
         "rpc",
