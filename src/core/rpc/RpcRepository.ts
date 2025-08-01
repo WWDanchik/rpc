@@ -1,5 +1,5 @@
 import z from "zod";
-import { RelationKey, IdFieldMap, LoadCallback } from "../types";
+import { IdFieldMap, LoadCallback, RelationKey, RelationTree } from "../types";
 import { Rpc } from "./Rpc";
 
 export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
@@ -59,7 +59,6 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
 
     public mergeRpc<T extends keyof TTypes>(
         type: T,
-        source: Array<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never>,
         target:
             | Record<
                   string,
@@ -69,6 +68,7 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
               >
             | Array<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never>
     ): Array<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never> {
+        const source = this.findAll(type);
         const rpc = this.getRpc(type);
         const mergePath = rpc.getMergePath();
 
@@ -215,7 +215,8 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
         TTarget extends keyof TTypes
     >(
         sourceType: TSource,
-        targetType: TTarget
+        targetType: TTarget,
+        relatedFieldName: string
     ): {
         hasMany: <
             TForeignField extends keyof z.infer<
@@ -248,6 +249,10 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
                     String(foreign.field),
                     String(localKey)
                 );
+                
+                // Сохраняем связанное поле
+                sourceRpc.getRelatedFields()[targetType as string] = relatedFieldName;
+                
                 return this;
             },
             belongsTo: (foreign, localKey) => {
@@ -257,6 +262,10 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
                     String(foreign.field),
                     String(localKey)
                 );
+                
+                // Сохраняем связанное поле
+                sourceRpc.getRelatedFields()[targetType as string] = relatedFieldName;
+                
                 return this;
             },
         };
@@ -375,8 +384,8 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
         return allRelations;
     }
 
-    public getRelationsForType(typeName: string) {
-        const rpc = this.rpcs.get(typeName);
+    public getRelationsForType(typeName: keyof TTypes) {
+        const rpc = this.rpcs.get(typeName as string);
         if (!rpc) return {};
 
         const relations = rpc.getRelations();
@@ -639,8 +648,6 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
         return result;
     }
 
-
-
     private mergeArrayDeep<T extends keyof TTypes>(
         type: T,
         updates: Record<
@@ -701,6 +708,137 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
             throw new Error(`RPC type "${String(type)}" not registered`);
         }
         return rpc;
+    }
+
+    public getFullRelation(): RelationTree {
+        const tree: RelationTree = {};
+        const visited = new Set<string>();
+
+        for (const [typeName] of this.rpcs.entries()) {
+            this.buildRelationTree(typeName, tree, visited);
+        }
+
+        return tree;
+    }
+
+    public getFullRelatedData<TResult>(
+        type: string,
+        id?: string | number,
+        visited: Set<string> = new Set()
+    ): TResult | TResult[] | null {
+        if (id === undefined) {
+            const allRecords = this.findAll(type);
+            return allRecords
+                .map(record => {
+                    const recordId = (record as any)[this.getRpc(type).getForeignKey()];
+                    return this.getFullRelatedData<TResult>(type, recordId, visited);
+                })
+                .filter(item => item !== null) as TResult[];
+        }
+
+        const rootRecord = this.findById(type, id);
+        if (!rootRecord) return null;
+
+        const visitedKey = `${String(type)}:${id}`;
+        if (visited.has(visitedKey)) {
+            return rootRecord as TResult;
+        }
+        visited.add(visitedKey);
+
+        const result = { ...rootRecord } as any;
+        const relations = this.getRelationsForType(type);
+
+        for (const [targetType, relation] of Object.entries(relations)) {
+            const relatedData = this.getRelated(
+                type,
+                id,
+                targetType as keyof TTypes
+            );
+
+            if (relatedData.length > 0) {
+                const rpc = this.getRpc(type);
+                const relatedFields = rpc.getRelatedFields();
+                const newFieldName = relatedFields[targetType] || targetType;
+                delete result[relation.localKey];
+
+                if (relation.relationType === "one-to-many") {
+                    result[newFieldName] = relatedData
+                        .map((relatedItem) => {
+                            const targetRpc = this.getRpc(targetType);
+                            const foreignKey = targetRpc.getForeignKey();
+                            const relatedId = (relatedItem as any)[foreignKey];
+                            if (relatedId !== undefined) {
+                                return this.getFullRelatedData<TResult>(
+                                    targetType,
+                                    relatedId,
+                                    visited
+                                );
+                            }
+                            return relatedItem;
+                        })
+                        .filter((item) => item !== null);
+                } else {
+                    const relatedItem = relatedData[0];
+                    const targetRpc = this.getRpc(targetType);
+                    const foreignKey = targetRpc.getForeignKey();
+                    const relatedId = (relatedItem as any)[foreignKey];
+                    if (relatedId !== undefined) {
+                        result[newFieldName] = this.getFullRelatedData<TResult>(
+                            targetType,
+                            relatedId,
+                            visited
+                        );
+                    } else {
+                        result[newFieldName] = relatedItem;
+                    }
+                }
+            }
+        }
+
+        return result as TResult;
+    }
+
+    private buildRelationTree(
+        typeName: string,
+        tree: RelationTree,
+        visited: Set<string>
+    ): void {
+        if (visited.has(typeName)) return;
+        visited.add(typeName);
+
+        const rpc = this.getRpc(typeName);
+        const relations = rpc.getRelations();
+
+        if (!tree[typeName]) {
+            tree[typeName] = {
+                relations: {},
+                children: {},
+            };
+        }
+
+        for (const [targetType, relation] of relations.entries()) {
+            tree[typeName].relations[targetType] = {
+                targetType: relation.targetType,
+                relationType: relation.relationType,
+                foreignKey: String(relation.foreignKey),
+                localKey: String(relation.localKey),
+            };
+
+            // Рекурсивно строим дерево для связанного типа
+            if (!tree[typeName].children) {
+                tree[typeName].children = {};
+            }
+
+            if (!tree[typeName].children![targetType]) {
+                tree[typeName].children![targetType] = {};
+            }
+
+            this.buildRelationTree(
+                targetType,
+                tree[typeName].children![targetType],
+                visited
+            );
+        }
     }
 }
 

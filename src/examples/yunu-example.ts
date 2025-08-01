@@ -49,22 +49,18 @@ const productSchema = z.object({
     is_stretched: z.boolean(),
 });
 
-const cellRpc = new Rpc("cell", cellSchema, "cell_id", {
-    products_ids: "id",
-});
-const rectangleRpc = new Rpc("rectangle", rectangleSchema, "id", {
-    cell_ids: "id",
-});
-const productRpc = new Rpc("product", productSchema, "id", {
-    barcode_ids: "id",
-});
+const cellRpc = new Rpc("cell", cellSchema, "cell_id");
+
+const rectangleRpc = new Rpc("rectangle", rectangleSchema, "id");
+
+const productRpc = new Rpc("product", productSchema, "id");
 
 const rpcRepository = new RpcRepository()
     .registerRpc("cell", cellRpc)
     .registerRpc("product", productRpc)
     .registerRpc("rectangle", rectangleRpc);
 
-rpcRepository.defineRelation("rectangle", "cell").hasMany(
+rpcRepository.defineRelation("rectangle", "cell", "cells").hasMany(
     {
         field: "cell_ids",
         key: "id",
@@ -72,7 +68,7 @@ rpcRepository.defineRelation("rectangle", "cell").hasMany(
     "cell_id"
 );
 
-rpcRepository.defineRelation("cell", "product").hasMany(
+rpcRepository.defineRelation("cell", "product", "products").hasMany(
     {
         field: "products_ids",
         key: "id",
@@ -221,3 +217,115 @@ async function getAllRectanglesWithData(): Promise<RectangleWithData[]> {
 getAllRectanglesWithData().then((rectanglesWithAllData) => {
     console.log(JSON.stringify(rectanglesWithAllData, null, 2));
 });
+
+const relationTree = rpcRepository.getFullRelation();
+console.log("Дерево связей:");
+console.log(JSON.stringify(relationTree, null, 2));
+
+const fullRelatedRectangleData = rpcRepository.getFullRelatedData(
+    "rectangle",
+    1
+);
+const fullRelatedCellData = rpcRepository.getFullRelatedData("cell", 1);
+const allCellsWithRelations = rpcRepository.getFullRelatedData("cell");
+
+console.log("Cell with relations:", fullRelatedCellData);
+console.log("All cells with relations:", allCellsWithRelations);
+const fullRelatedProductData = rpcRepository.getFullRelatedData("product", 1);
+
+if (fullRelatedRectangleData) {
+    console.log("Rectangle с полными данными:");
+    console.log(JSON.stringify(fullRelatedRectangleData, null, 2));
+}
+
+if (fullRelatedCellData) {
+    console.log("Cell с полными данными:");
+    console.log(JSON.stringify(fullRelatedCellData, null, 2));
+}
+
+if (fullRelatedProductData) {
+    console.log("Product с полными данными:");
+    console.log(JSON.stringify(fullRelatedProductData, null, 2));
+}
+
+console.log("\n=== Рекурсивная связь cell -> cell ===");
+
+const hierarchicalCellSchema = z.object({
+    id: z.number(),
+    name: z.string(),
+    parent_id: z.number().optional(),
+    children_ids: z.array(z.object({ id: z.number() })).optional(),
+});
+
+const hierarchicalCellRpc = new Rpc(
+    "hierarchical_cell",
+    hierarchicalCellSchema,
+    "id"
+);
+
+const hierarchicalRepository = new RpcRepository().registerRpc(
+    "hierarchical_cell",
+    hierarchicalCellRpc
+);
+
+hierarchicalRepository
+    .defineRelation("hierarchical_cell", "hierarchical_cell", "children")
+    .hasMany(
+        {
+            field: "children_ids",
+            key: "id",
+        },
+        "parent_id"
+    );
+
+const parentCell = hierarchicalRepository.save("hierarchical_cell", {
+    id: 1,
+    name: "Parent Cell",
+    parent_id: undefined,
+    children_ids: [{ id: 2 }, { id: 3 }],
+});
+
+const childCell1 = hierarchicalRepository.save("hierarchical_cell", {
+    id: 2,
+    name: "Child Cell 1",
+    parent_id: 1,
+    children_ids: [],
+});
+
+const childCell2 = hierarchicalRepository.save("hierarchical_cell", {
+    id: 3,
+    name: "Child Cell 2",
+    parent_id: 1,
+    children_ids: [{ id: 4 }],
+});
+
+const grandchildCell = hierarchicalRepository.save("hierarchical_cell", {
+    id: 4,
+    name: "Grandchild Cell",
+    parent_id: 3,
+    children_ids: [],
+});
+
+interface HierarchicalCell {
+    id: number;
+    name: string;
+    parent_id?: number;
+    children_ids?: { id: number }[];
+    children?: HierarchicalCell[];
+}
+
+const fullHierarchy =
+    hierarchicalRepository.getFullRelatedData<HierarchicalCell>(
+        "hierarchical_cell",
+        1
+    );
+console.log("Полная иерархия ячеек:", JSON.stringify(fullHierarchy, null, 2));
+
+const allCellsWithHierarchy =
+    hierarchicalRepository.getFullRelatedData<HierarchicalCell>(
+        "hierarchical_cell"
+    );
+console.log(
+    "Все ячейки с иерархией:",
+    JSON.stringify(allCellsWithHierarchy, null, 2)
+);
