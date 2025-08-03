@@ -1,6 +1,8 @@
 import z from "zod";
 import { Rpc } from "../core/rpc/Rpc";
-import { RpcRepository } from "../core/rpc/RpcRepository";
+import { RpcRepository, RepositoryTypes } from "../core/rpc/RpcRepository";
+import { Message } from "../core/types";
+import { log } from "console";
 
 const cellSchema = z.object({
     cell_id: z.number(),
@@ -329,3 +331,107 @@ console.log(
     "Все ячейки с иерархией:",
     JSON.stringify(allCellsWithHierarchy, null, 2)
 );
+
+console.log(
+    JSON.stringify(
+        cellRpc.createMessage({
+            1: {
+                cell_id: 1,
+                cell_name: "Ячейка A1",
+                cell_value: "CELL_000222222",
+                is_stretched: true,
+                products_ids: [{ id: 1 }],
+            },
+        }),
+        null,
+        2
+    )
+);
+
+console.log(
+    JSON.stringify(
+        cellRpc.createMessage({
+            1: {
+                cell_id: 1,
+                cell_name: "Ячейка A1",
+                cell_value: "CELL_000222222",
+                is_stretched: true,
+                products_ids: [{ id: 1 }],
+            },
+        }),
+        null,
+        2
+    )
+);
+
+const messages: Array<Message<RepositoryTypes<typeof rpcRepository>>> = [
+    {
+        type: "cell",
+        payload: {
+            1: {
+                cell_id: 1,
+                cell_name: "Обновленная ячейка A1",
+                cell_value: "CELL_000333333",
+                is_stretched: false,
+                products_ids: [{ id: 1 }, { id: 2 }],
+            },
+            2: {
+                cell_id: 2,
+                cell_name: "Новая ячейка B1",
+                cell_value: "CELL_000444444",
+                is_stretched: true,
+                products_ids: [{ id: 3 }],
+            },
+        },
+    },
+    {
+        type: "rectangle",
+        payload: {
+            1: {
+                id: 1,
+                cell_ids: [{ id: 1 }, { id: 2 }],
+                map_cells: {
+                    pos_1_1: {
+                        id: 101,
+                        type: "pallet" as const,
+                    },
+                },
+            },
+        },
+    },
+    {
+        type: "product",
+        payload: [
+            {
+                id: 1,
+                article: "ART003",
+                name: "Продукт A",
+                gravatar: "https://example.com/img3.jpg",
+                barcode_ids: [{ id: 3001 }],
+                is_stretched: false,
+            },
+            {
+                id: 2,
+                article: "ART004",
+                name: "Продукт B",
+                gravatar: "https://example.com/img4.jpg",
+                barcode_ids: [{ id: 4001 }],
+                is_stretched: true,
+            },
+            {
+                id: 3,
+                article: "ART005",
+                name: "Продукт C",
+                gravatar: "https://example.com/img5.jpg",
+                barcode_ids: [{ id: 5001 }],
+                is_stretched: false,
+            },
+        ],
+    },
+];
+
+console.log("Обработка массива сообщений:");
+rpcRepository.handleMessages(messages);
+
+console.log("Состояние после обработки сообщений:");
+console.log(JSON.stringify(rpcRepository.getState(), null, 2));

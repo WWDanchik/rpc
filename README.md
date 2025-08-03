@@ -225,6 +225,67 @@ interface HierarchicalCell {
 const fullHierarchy = hierarchicalRepository.getFullRelatedData<HierarchicalCell>("hierarchical_cell", 1);
 ```
 
+## Обработка сообщений
+
+### handleMessages метод
+
+```typescript
+const messages: Array<{
+    type: "cell" | "rectangle" | "product";
+    payload: any;
+}> = [
+    {
+        type: "cell",
+        payload: {
+            1: {
+                cell_id: 1,
+                cell_name: "Обновленная ячейка A1",
+                cell_value: "CELL_000333333",
+                is_stretched: false,
+                products_ids: [{ id: 1 }, { id: 2 }],
+            },
+            2: {
+                cell_id: 2,
+                cell_name: "Новая ячейка B1",
+                cell_value: "CELL_000444444",
+                is_stretched: true,
+                products_ids: [{ id: 3 }],
+            },
+        },
+    },
+    {
+        type: "rectangle",
+        payload: {
+            1: {
+                id: 1,
+                name: "Обновленный прямоугольник",
+                width: 200,
+                height: 150,
+                cell_ids: [{ id: 1 }, { id: 2 }],
+            },
+        },
+    },
+    {
+        type: "product",
+        payload: [
+            {
+                id: 1,
+                name: "Продукт A",
+                price: 100,
+            },
+            {
+                id: 2,
+                name: "Продукт B",
+                price: 200,
+            },
+        ],
+    },
+];
+
+// Обработка массива сообщений
+rpcRepository.handleMessages(messages);
+```
+
 ## Глубокое слияние данных
 
 ### mergeRpc метод
@@ -244,6 +305,81 @@ const updatedCells = rpcRepository.mergeRpc("cell", {
 });
 ```
 
+## Message API
+
+Библиотека поддерживает работу с сообщениями для массового обновления данных:
+
+### Создание сообщений
+
+```typescript
+// Создание сообщения с обновлениями
+const cellMessage = cellRpc.createMessage({
+    "1": {
+        cell_id: 1,
+        cell_name: "Updated Cell",
+        cell_value: "CELL_001",
+        is_stretched: true,
+        products_ids: [{ id: 1 }, { id: 2 }],
+    },
+    "2": null, // удаление записи
+});
+
+// Создание сообщения с массивом записей
+const cellArrayMessage = cellRpc.createMessage([
+    {
+        cell_id: 1,
+        cell_name: "Cell 1",
+        cell_value: "CELL_001",
+        is_stretched: true,
+        products_ids: [{ id: 1 }],
+    },
+    {
+        cell_id: 2,
+        cell_name: "Cell 2", 
+        cell_value: "CELL_002",
+        is_stretched: false,
+        products_ids: [{ id: 2 }],
+    },
+]);
+```
+
+### Обработка сообщений
+
+```typescript
+// Массовая обработка сообщений
+const messages: Array<Message<RepositoryTypes<typeof rpcRepository>>> = [
+    {
+        type: "cell",
+        payload: {
+            "1": { cell_name: "Updated Cell" },
+            "2": null,
+        },
+    },
+    {
+        type: "product", 
+        payload: [
+            { id: 1, name: "Product 1", article: "ART001" },
+            { id: 2, name: "Product 2", article: "ART002" },
+        ],
+    },
+];
+
+rpcRepository.handleMessages(messages);
+```
+
+### Типы сообщений
+
+```typescript
+type Message<TTypes extends Record<string, Rpc<any>>> = {
+    [K in keyof TTypes]: {
+        type: K;
+        payload: 
+            | Record<string, Partial<TTypes[K] extends Rpc<infer S> ? z.infer<S> : never> | null>
+            | Array<TTypes[K] extends Rpc<infer S> ? z.infer<S> : never>;
+    };
+}[keyof TTypes];
+```
+
 ## API Reference
 
 ### Rpc
@@ -260,6 +396,13 @@ class Rpc<TSchema extends z.ZodSchema> {
     getSchema(): TSchema;
     getForeignKey(): keyof z.infer<TSchema>;
     getRelatedFields(): Record<string, string>;
+    
+    createMessage(
+        data: Record<string, Partial<z.infer<TSchema>> | null> | Array<z.infer<TSchema>>
+    ): {
+        type: string;
+        payload: Record<string, Partial<z.infer<TSchema>> | null> | Array<z.infer<TSchema>>;
+    };
 }
 ```
 
@@ -307,6 +450,12 @@ class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
         type: T
     ): Array<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never>;
     
+    getRelated<TSource extends keyof TTypes, TTarget extends keyof TTypes>(
+        sourceType: TSource,
+        sourceId: string | number,
+        targetType: TTarget
+    ): Array<TTypes[TTarget] extends Rpc<infer S> ? z.infer<S> : never>;
+    
     getFullRelatedData<TResult>(
         type: string,
         id?: string | number,
@@ -319,6 +468,10 @@ class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
         type: T,
         target: Record<string, Partial<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never> | null> | Array<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never>
     ): Array<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never>;
+    
+    handleMessages(
+        messages: Array<Message<TTypes>>
+    ): void;
 }
 ```
 

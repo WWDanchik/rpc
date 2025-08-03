@@ -1,5 +1,5 @@
 import z from "zod";
-import { IdFieldMap, LoadCallback, RelationKey, RelationTree } from "../types";
+import { IdFieldMap, LoadCallback, RelationKey, RelationTree, Message } from "../types";
 import { Rpc } from "./Rpc";
 
 export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
@@ -21,7 +21,7 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
         if (loadCallback) {
             this.loadCallbacks.set(name, loadCallback);
         }
-        return this;
+        return this as RpcRepository<TTypes & { [K in TName]: TRpc }>;
     }
 
     public getState() {
@@ -242,15 +242,14 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
         ) => RpcRepository<TTypes>;
     } {
         return {
-            hasMany: (foreign, localKey) => {
+            hasMany: (foreign, _localKey) => {
                 const sourceRpc = this.getRpc(sourceType);
                 (sourceRpc as any).hasMany(
                     targetType as string,
-                    String(foreign.field),
-                    String(localKey)
+                    String(foreign.key),
+                    String(foreign.field)
                 );
                 
-                // Сохраняем связанное поле
                 sourceRpc.getRelatedFields()[targetType as string] = relatedFieldName;
                 
                 return this;
@@ -263,7 +262,6 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
                     String(localKey)
                 );
                 
-                // Сохраняем связанное поле
                 sourceRpc.getRelatedFields()[targetType as string] = relatedFieldName;
                 
                 return this;
@@ -288,11 +286,23 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
         if (!relation) return [];
 
         if (relation.relationType === "one-to-many") {
-            return this.findBy(
-                targetType,
-                relation.foreignKey as any,
-                (sourceRecord as any)[relation.localKey as string]
-            );
+            const sourceValue = (sourceRecord as any)[relation.localKey as string];
+            
+            if (Array.isArray(sourceValue)) {
+                const targetIds = sourceValue.map((item: any) => {
+                    return item[relation.foreignKey as string] || item.id;
+                });
+                
+                return targetIds
+                    .map(id => this.findById(targetType, id))
+                    .filter(Boolean) as Array<TTypes[TTarget] extends Rpc<infer S> ? z.infer<S> : never>;
+            } else {
+                return this.findBy(
+                    targetType,
+                    relation.foreignKey as any,
+                    sourceValue
+                );
+            }
         } else {
             const foreignKeyValue = (sourceRecord as any)[
                 relation.localKey as string
@@ -840,6 +850,20 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
             );
         }
     }
+
+    public handleMessages(
+        messages: Array<Message<TTypes>>
+    ): void {
+        for (const message of messages) {
+            const { type, payload } = message;
+            
+            if (this.rpcs.has(String(type))) {
+                this.mergeRpc(type, payload);
+            } else {
+                console.warn(`Unknown RPC type: ${String(type)}`);
+            }
+        }
+    }
 }
 
 export function createRpcRepository() {
@@ -855,3 +879,5 @@ export function setupRepository<T extends RpcRepository<any>>(
 export type RepositoryState<T extends RpcRepository<any>> = ReturnType<
     T["getState"]
 >;
+
+export type RepositoryTypes<T extends RpcRepository<any>> = T extends RpcRepository<infer U> ? U : never;

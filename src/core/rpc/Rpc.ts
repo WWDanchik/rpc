@@ -10,7 +10,7 @@ export class Rpc<TSchema extends z.ZodSchema = z.ZodSchema> {
     private foreignKey: ZodSchemaKeys<TSchema>;
     private mergePath: Record<string, string>;
     private relatedFields: Record<string, string>;
-    
+
     constructor(
         type: string,
         fields: TSchema,
@@ -53,6 +53,36 @@ export class Rpc<TSchema extends z.ZodSchema = z.ZodSchema> {
 
     public getMergePath(): Record<string, string> {
         return this.mergePath;
+    }
+
+    public createMessage(
+        data: Record<string, Partial<ZodSchemaType<TSchema>> | null>
+    ): {
+        type: string;
+        payload: Record<string, Partial<ZodSchemaType<TSchema>> | null>;
+    };
+    
+    public createMessage(
+        data: Array<ZodSchemaType<TSchema>>
+    ): {
+        type: string;
+        payload: Array<ZodSchemaType<TSchema>>;
+    };
+
+    public createMessage(
+        data:
+            | Record<string, Partial<ZodSchemaType<TSchema>> | null>
+            | Array<ZodSchemaType<TSchema>>
+    ): {
+        type: string;
+        payload:
+            | Record<string, Partial<ZodSchemaType<TSchema>> | null>
+            | Array<ZodSchemaType<TSchema>>;
+    } {
+        return {
+            type: this.type,
+            payload: data,
+        };
     }
 
     public hasMany<TTargetSchema extends z.ZodSchema>(

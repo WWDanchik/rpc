@@ -1,8 +1,6 @@
 import z from "zod";
 import { Rpc } from "./rpc/Rpc";
 
-
-
 export type RelationType = "one-to-one" | "one-to-many" | "many-to-many";
 
 export type ZodSchemaKeys<T extends z.ZodSchema> = keyof z.infer<T>;
@@ -213,20 +211,25 @@ export type FieldNameMap = {
     [type: string]: string;
 };
 
-// Тип для мапы полей, исключающий текущий тип
 export type RelatedFieldNameMap<TTypes extends Record<string, Rpc<any>>, TCurrent extends keyof TTypes> = {
     [K in keyof TTypes]: K extends TCurrent ? never : string;
 };
 
-// Тип для получения связанных типов для конкретного типа
 export type RelatedTypes<TTypes extends Record<string, Rpc<any>>, T extends keyof TTypes> = {
     [K in keyof TTypes]: K extends T ? never : K;
 }[keyof TTypes];
 
-// Тип для мапы полей только связанных типов
 export type RelatedFieldsMapFor = Partial<Record<string, string>>;
 
-
-
-// Тип для мапы полей только связанных типов (упрощенная версия)
 export type RelatedFieldsMapAuto = Partial<Record<string, string>>;
+
+export type Message<TTypes extends Record<string, Rpc<any>>> = {
+    [K in keyof TTypes]: {
+        type: K;
+        payload: 
+            | Record<string, Partial<TTypes[K] extends Rpc<infer S> ? z.infer<S> : never> | null>
+            | Array<TTypes[K] extends Rpc<infer S> ? z.infer<S> : never>;
+    };
+}[keyof TTypes];
+
+

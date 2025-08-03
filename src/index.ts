@@ -14,6 +14,7 @@ export type {
     TypedRpcRelation,
     ZodSchemaKeys,
     ZodSchemaType,
+    Message,
 } from "./core/types";
 
 export { z } from "zod";
