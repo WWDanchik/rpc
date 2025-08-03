@@ -88,39 +88,45 @@ export class Rpc<TSchema extends z.ZodSchema = z.ZodSchema> {
     public hasMany<TTargetSchema extends z.ZodSchema>(
         targetType: string,
         foreignKey: ZodSchemaKeys<TTargetSchema>,
-        localKey: ZodSchemaKeys<TSchema> = "id" as ZodSchemaKeys<TSchema>
+        localKey: ZodSchemaKeys<TSchema> = "id" as ZodSchemaKeys<TSchema>,
+        arrayKey: string
     ): this {
         return this.addRelation(targetType, {
             targetType,
             relationType: "one-to-many",
             foreignKey,
             localKey,
+            arrayKey,
         });
     }
 
     public hasOne<TTargetSchema extends z.ZodSchema>(
         targetType: string,
         foreignKey: ZodSchemaKeys<TTargetSchema>,
-        localKey: ZodSchemaKeys<TSchema> = "id" as ZodSchemaKeys<TSchema>
+        localKey: ZodSchemaKeys<TSchema> = "id" as ZodSchemaKeys<TSchema>,
+        arrayKey: string = "id"
     ): this {
         return this.addRelation(targetType, {
             targetType,
             relationType: "one-to-one",
             foreignKey,
             localKey,
+            arrayKey,
         });
     }
 
     public belongsTo<TTargetSchema extends z.ZodSchema>(
         targetType: string,
         foreignKey: ZodSchemaKeys<TSchema>,
-        localKey: ZodSchemaKeys<TTargetSchema> = "id" as ZodSchemaKeys<TTargetSchema>
+        localKey: ZodSchemaKeys<TTargetSchema> = "id" as ZodSchemaKeys<TTargetSchema>,
+        arrayKey: string = "id"
     ): this {
         return this.addRelation(targetType, {
             targetType,
             relationType: "one-to-one",
             foreignKey: localKey,
             localKey: foreignKey,
+            arrayKey,
         });
     }
 

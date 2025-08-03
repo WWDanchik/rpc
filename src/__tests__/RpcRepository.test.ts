@@ -1,0 +1,325 @@
+import { describe, it, expect, beforeEach } from 'vitest'
+import { RpcRepository } from '../core/rpc/RpcRepository'
+import { Rpc } from '../core/rpc/Rpc'
+import z from 'zod'
+
+describe('RpcRepository', () => {
+  let repository: any
+
+  const userSchema = z.object({
+    id: z.number(),
+    name: z.string(),
+    email: z.string().email(),
+    post_ids: z.array(z.object({ id: z.number() })).optional(),
+  })
+
+  const postSchema = z.object({
+    id: z.number(),
+    title: z.string(),
+    userId: z.number(),
+  })
+
+  const tagSchema = z.object({
+    id: z.number(),
+    name: z.string(),
+  })
+
+  const userRpc = new Rpc('user', userSchema, 'id')
+  const postRpc = new Rpc('post', postSchema, 'id')
+  const tagRpc = new Rpc('tag', tagSchema, 'id')
+
+  beforeEach(() => {
+    repository = new RpcRepository()
+      .registerRpc('user', userRpc)
+      .registerRpc('post', postRpc)
+      .registerRpc('tag', tagRpc)
+
+    repository.defineRelation('user', 'post', 'posts').hasMany(
+      { field: 'post_ids', key: 'id' },
+      'id'
+    )
+
+    repository.defineRelation('post', 'tag', 'tags').hasMany(
+      { field: 'id', key: 'id' },
+      'id'
+    )
+  })
+
+  describe('registerRpc', () => {
+    it('should register RPC types', () => {
+      const newRepository = new RpcRepository()
+      const result = newRepository.registerRpc('user', userRpc)
+      
+      expect(result).toBe(newRepository)
+    })
+  })
+
+  describe('save and findById', () => {
+    it('should save and find user by id', () => {
+      const userData = {
+        id: 1,
+        name: 'John Doe',
+        email: 'john@example.com',
+      }
+
+      const savedUser = repository.save('user', userData)
+      expect(savedUser).toEqual(userData)
+
+      const foundUser = repository.findById('user', 1)
+      expect(foundUser).toEqual(userData)
+    })
+
+    it('should return null for non-existent user', () => {
+      const foundUser = repository.findById('user', 999)
+      expect(foundUser).toBeNull()
+    })
+  })
+
+  describe('saveMany', () => {
+    it('should save multiple users', () => {
+      const users = [
+        { id: 1, name: 'John', email: 'john@example.com' },
+        { id: 2, name: 'Jane', email: 'jane@example.com' },
+      ]
+
+      const savedUsers = repository.saveMany('user', users)
+      expect(savedUsers).toHaveLength(2)
+      expect(savedUsers[0]).toEqual(users[0])
+      expect(savedUsers[1]).toEqual(users[1])
+    })
+  })
+
+  describe('findAll', () => {
+    it('should find all users', () => {
+      const users = [
+        { id: 1, name: 'John', email: 'john@example.com' },
+        { id: 2, name: 'Jane', email: 'jane@example.com' },
+      ]
+
+      repository.saveMany('user', users)
+      const allUsers = repository.findAll('user')
+      expect(allUsers).toHaveLength(2)
+    })
+  })
+
+  describe('findBy', () => {
+    it('should find users by field', () => {
+      const users = [
+        { id: 1, name: 'John', email: 'john@example.com' },
+        { id: 2, name: 'Jane', email: 'jane@example.com' },
+        { id: 3, name: 'John', email: 'john2@example.com' },
+      ]
+
+      repository.saveMany('user', users)
+      const johns = repository.findBy('user', 'name', 'John')
+      expect(johns).toHaveLength(2)
+    })
+  })
+
+  describe('update', () => {
+    it('should update user', async () => {
+      const user = repository.save('user', {
+        id: 1,
+        name: 'John',
+        email: 'john@example.com',
+      })
+
+      const updatedUser = await repository.update('user', 1, {
+        name: 'John Updated',
+      })
+
+      expect(updatedUser?.name).toBe('John Updated')
+      expect(updatedUser?.email).toBe('john@example.com')
+    })
+
+    it('should return null for non-existent user', async () => {
+      const result = await repository.update('user', 999, { name: 'Test' })
+      expect(result).toBeNull()
+    })
+  })
+
+  describe('remove', () => {
+    it('should remove user', () => {
+      repository.save('user', {
+        id: 1,
+        name: 'John',
+        email: 'john@example.com',
+      })
+
+      const removed = repository.remove('user', 1)
+      expect(removed).toBe(true)
+
+      const found = repository.findById('user', 1)
+      expect(found).toBeNull()
+    })
+  })
+
+  describe('relations', () => {
+    beforeEach(() => {
+      // Save test data
+      repository.save('user', {
+        id: 1,
+        name: 'John',
+        email: 'john@example.com',
+        post_ids: [{ id: 1 }, { id: 2 }],
+      })
+
+      repository.save('post', {
+        id: 1,
+        title: 'Post 1',
+        userId: 1,
+      })
+
+      repository.save('post', {
+        id: 2,
+        title: 'Post 2',
+        userId: 1,
+      })
+
+      repository.save('tag', { id: 1, name: 'Tech' })
+      repository.save('tag', { id: 2, name: 'News' })
+    })
+
+    it('should get related posts for user (duplicate test)', () => {
+      const posts = repository.getRelated('user', 1, 'post')
+      expect(posts).toHaveLength(2)
+      expect(posts[0]?.title).toBe('Post 1')
+      expect(posts[1]?.title).toBe('Post 2')
+    })
+
+    it('should get related posts for user', () => {
+      const posts = repository.getRelated('user', 1, 'post')
+      expect(posts).toHaveLength(2)
+      
+
+      const post1 = posts.find(post => post.id === 1)
+      const post2 = posts.find(post => post.id === 2)
+      
+      expect(post1?.title).toBe('Post 1')
+      expect(post2?.title).toBe('Post 2')
+    })
+
+    it('should return empty array for non-existent relations', () => {
+      const posts = repository.getRelated('user', 999, 'post')
+      expect(posts).toHaveLength(0)
+    })
+  })
+
+  describe('getFullRelatedData', () => {
+    beforeEach(() => {
+      repository.save('user', {
+        id: 1,
+        name: 'John',
+        email: 'john@example.com',
+        post_ids: [{ id: 1 }],
+      })
+
+      repository.save('post', {
+        id: 1,
+        title: 'Post 1',
+        userId: 1,
+        tags: [{ id: 1 }],
+      })
+
+      repository.save('tag', { id: 1, name: 'Tech' })
+    })
+
+    it('should get full related data for user', () => {
+      const fullData = repository.getFullRelatedData('user', 1)
+      expect(fullData).toBeDefined()
+      expect((fullData as any).posts).toBeDefined()
+      expect((fullData as any).posts[0].tags).toBeDefined()
+    })
+  })
+
+  describe('mergeRpc', () => {
+    it('should merge with array', () => {
+      repository.save('user', { id: 1, name: 'John', email: 'john@example.com' })
+
+      const merged = repository.mergeRpc('user', [
+        { id: 1, name: 'John Updated', email: 'john@example.com' },
+        { id: 2, name: 'Jane', email: 'jane@example.com' },
+      ])
+
+      expect(merged).toHaveLength(2)
+      
+      // Find items by id instead of relying on order
+      const johnUpdated = merged.find(item => item.id === 1)
+      const jane = merged.find(item => item.id === 2)
+      
+      expect(johnUpdated?.name).toBe('John Updated')
+      expect(jane?.name).toBe('Jane')
+    })
+
+    it('should merge with record', () => {
+      repository.save('user', { id: 1, name: 'John', email: 'john@example.com' })
+
+      const merged = repository.mergeRpc('user', {
+        '1': { name: 'John Updated' },
+        '2': { id: 2, name: 'Jane', email: 'jane@example.com' },
+      })
+
+      expect(merged).toHaveLength(2)
+      
+      // Find items by id instead of relying on order
+      const johnUpdated = merged.find(item => item.id === 1)
+      const jane = merged.find(item => item.id === 2)
+      
+      expect(johnUpdated?.name).toBe('John Updated')
+      expect(jane?.name).toBe('Jane')
+    })
+  })
+
+  describe('handleMessages', () => {
+    it('should handle messages', () => {
+      const messages = [
+        {
+          type: 'user' as const,
+          payload: {
+            '1': { id: 1, name: 'John', email: 'john@example.com' },
+            '2': { id: 2, name: 'Jane', email: 'jane@example.com' },
+          },
+        },
+      ]
+
+      repository.handleMessages(messages)
+
+      const users = repository.findAll('user')
+      expect(users).toHaveLength(2)
+    })
+  })
+
+  describe('getStats', () => {
+    it('should return stats', () => {
+      repository.save('user', { id: 1, name: 'John', email: 'john@example.com' })
+      repository.save('user', { id: 2, name: 'Jane', email: 'jane@example.com' })
+
+      const stats = repository.getStats()
+      expect(stats.user.count).toBe(2)
+      expect(stats.user.ids).toEqual(['1', '2'])
+    })
+  })
+
+  describe('getAllRelations', () => {
+    it('should return all relations', () => {
+      const relations = repository.getAllRelations()
+      expect(relations.user).toBeDefined()
+      expect(relations.user.post).toBeDefined()
+    })
+  })
+
+  describe('getRelationsForType', () => {
+    it('should return relations for specific type', () => {
+      const relations = repository.getRelationsForType('user')
+      expect(relations.post).toBeDefined()
+    })
+  })
+
+  describe('getFullRelation', () => {
+    it('should return full relation tree', () => {
+      const tree = repository.getFullRelation()
+      expect(tree.user).toBeDefined()
+      expect(tree.user.relations.post).toBeDefined()
+    })
+  })
+}) 

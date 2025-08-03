@@ -14,6 +14,7 @@ export type TypedRpcRelation<
     relationType: RelationType;
     foreignKey: ZodSchemaKeys<TTargetSchema>;
     localKey: ZodSchemaKeys<TLocalSchema>;
+    arrayKey: string;
 };
 
 export type RpcRelation = {

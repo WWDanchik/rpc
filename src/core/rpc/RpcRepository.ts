@@ -246,8 +246,9 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
                 const sourceRpc = this.getRpc(sourceType);
                 (sourceRpc as any).hasMany(
                     targetType as string,
-                    String(foreign.key),
-                    String(foreign.field)
+                    String(_localKey),
+                    String(foreign.field),
+                    String(foreign.key)
                 );
                 
                 sourceRpc.getRelatedFields()[targetType as string] = relatedFieldName;
@@ -289,8 +290,10 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
             const sourceValue = (sourceRecord as any)[relation.localKey as string];
             
             if (Array.isArray(sourceValue)) {
+                const arrayKey = relation.arrayKey || "id";
+                
                 const targetIds = sourceValue.map((item: any) => {
-                    return item[relation.foreignKey as string] || item.id;
+                    return item[arrayKey] || item.id;
                 });
                 
                 return targetIds
