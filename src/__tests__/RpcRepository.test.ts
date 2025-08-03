@@ -244,7 +244,6 @@ describe('RpcRepository', () => {
 
       expect(merged).toHaveLength(2)
       
-      // Find items by id instead of relying on order
       const johnUpdated = merged.find(item => item.id === 1)
       const jane = merged.find(item => item.id === 2)
       
@@ -262,11 +261,53 @@ describe('RpcRepository', () => {
 
       expect(merged).toHaveLength(2)
       
-      // Find items by id instead of relying on order
       const johnUpdated = merged.find(item => item.id === 1)
       const jane = merged.find(item => item.id === 2)
       
       expect(johnUpdated?.name).toBe('John Updated')
+      expect(jane?.name).toBe('Jane')
+    })
+
+    it('should delete items when null is passed in record', () => {
+      repository.save('user', { id: 1, name: 'John', email: 'john@example.com' })
+      repository.save('user', { id: 2, name: 'Jane', email: 'jane@example.com' })
+      repository.save('user', { id: 3, name: 'Bob', email: 'bob@example.com' })
+
+      const merged = repository.mergeRpc('user', {
+        '1': { name: 'John Updated' },
+        '2': null,
+        '3': { name: 'Bob Updated' },
+      })
+
+      expect(merged).toHaveLength(2)
+      
+      const johnUpdated = merged.find(item => item.id === 1)
+      const bobUpdated = merged.find(item => item.id === 3)
+      const jane = merged.find(item => item.id === 2)
+      
+      expect(johnUpdated?.name).toBe('John Updated')
+      expect(bobUpdated?.name).toBe('Bob Updated')
+      expect(jane).toBeUndefined()
+    })
+
+    it('should not delete items when using array input (arrays cannot contain null)', () => {
+      repository.save('user', { id: 1, name: 'John', email: 'john@example.com' })
+      repository.save('user', { id: 2, name: 'Jane', email: 'jane@example.com' })
+      repository.save('user', { id: 3, name: 'Bob', email: 'bob@example.com' })
+
+      const merged = repository.mergeRpc('user', [
+        { id: 1, name: 'John Updated', email: 'john@example.com' },
+        { id: 3, name: 'Bob Updated', email: 'bob@example.com' },
+      ])
+
+      expect(merged).toHaveLength(3)
+      
+      const johnUpdated = merged.find(item => item.id === 1)
+      const bobUpdated = merged.find(item => item.id === 3)
+      const jane = merged.find(item => item.id === 2)
+      
+      expect(johnUpdated?.name).toBe('John Updated')
+      expect(bobUpdated?.name).toBe('Bob Updated')
       expect(jane?.name).toBe('Jane')
     })
   })
@@ -582,6 +623,103 @@ describe("RpcRepository > data change events", () => {
         expect(events).toHaveLength(2);
         expect(events[0].type).toBe("user");
         expect(events[1].type).toBe("post");
+
+        repository.offDataChanged(listenerId);
+    });
+
+    it("should emit events when items are deleted via mergeRpc", async () => {
+        const events: Array<Message<any>> = [];
+        
+        const listenerId = repository.onDataChanged((eventEvents) => {
+            events.push(...eventEvents);
+        });
+
+        repository.save("user", {
+            id: 1,
+            name: "John",
+            email: "john@example.com",
+            age: 30,
+            isActive: true,
+            createdAt: "2023-01-01",
+        });
+
+        repository.save("user", {
+            id: 2,
+            name: "Jane",
+            email: "jane@example.com",
+            age: 25,
+            isActive: true,
+            createdAt: "2023-01-01",
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 10));
+
+        expect(events).toHaveLength(2);
+
+        repository.mergeRpc("user", {
+            "1": null,
+            "2": null,
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 10));
+
+        expect(events).toHaveLength(3);
+        expect(events[2].type).toBe("user");
+        expect(Array.isArray(events[2].payload)).toBe(true);
+
+        repository.offDataChanged(listenerId);
+    });
+
+    it("should emit events when some items are deleted via mergeRpc (partial deletion)", async () => {
+        const events: Array<Message<any>> = [];
+        
+        const listenerId = repository.onDataChanged((eventEvents) => {
+            events.push(...eventEvents);
+        });
+
+        repository.save("user", {
+            id: 1,
+            name: "John",
+            email: "john@example.com",
+            age: 30,
+            isActive: true,
+            createdAt: "2023-01-01",
+        });
+
+        repository.save("user", {
+            id: 2,
+            name: "Jane",
+            email: "jane@example.com",
+            age: 25,
+            isActive: true,
+            createdAt: "2023-01-01",
+        });
+
+        repository.save("user", {
+            id: 3,
+            name: "Bob",
+            email: "bob@example.com",
+            age: 35,
+            isActive: true,
+            createdAt: "2023-01-01",
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 10));
+
+        expect(events).toHaveLength(3);
+
+        repository.mergeRpc("user", {
+            "1": { name: "John Updated" },
+            "2": null,
+            "3": { name: "Bob Updated" },
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 10));
+
+        expect(events.length).toBeGreaterThan(3);
+        const lastEvent = events[events.length - 1];
+        expect(lastEvent.type).toBe("user");
+        expect(Array.isArray(lastEvent.payload)).toBe(true);
 
         repository.offDataChanged(listenerId);
     });

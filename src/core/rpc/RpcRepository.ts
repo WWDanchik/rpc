@@ -117,12 +117,10 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
             result = source;
         }
 
-        if (result.length > 0) {
-            this.emitDataChangedEvent({
-                type,
-                payload: this.findAll(type),
-            });
-        }
+        this.emitDataChangedEvent({
+            type,
+            payload: this.findAll(type),
+        });
 
         return result;
     }
