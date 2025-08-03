@@ -263,3 +263,13 @@ export type DataChangeFilter<
 > = {
     types: readonly TKeys[];
 };
+
+export type MergeRpc<
+    TTypes extends Record<string, Rpc<any>>,
+    K extends keyof TTypes = keyof TTypes
+> =
+    | Record<
+          string,
+          Partial<TTypes[K] extends Rpc<infer S> ? z.infer<S> : never> | null
+      >
+    | Array<TTypes[K] extends Rpc<infer S> ? z.infer<S> : never>;
