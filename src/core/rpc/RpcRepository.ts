@@ -1,11 +1,13 @@
 import z from "zod";
-import { IdFieldMap, LoadCallback, RelationKey, RelationTree, Message } from "../types";
+import { IdFieldMap, LoadCallback, RelationKey, RelationTree, Message, DataChangeEvent, DataChangeListener, DataChangeFilter } from "../types";
 import { Rpc } from "./Rpc";
+import { EventEmitter } from "../event/EventEmitter";
 
 export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
     private rpcs = new Map<string, Rpc<any>>();
     private data = new Map<string, Map<string, any>>();
     private loadCallbacks = new Map<string, LoadCallback<any>>();
+    private eventEmitter = new EventEmitter<TTypes>();
 
     constructor() {}
 
@@ -21,8 +23,10 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
         if (loadCallback) {
             this.loadCallbacks.set(name, loadCallback);
         }
-        return this as RpcRepository<TTypes & { [K in TName]: TRpc }>;
+        return this as unknown as RpcRepository<TTypes & { [K in TName]: TRpc }>;
     }
+
+
 
     public getState() {
         const state: Record<string, any> = {};
@@ -49,10 +53,19 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
             : never);
 
         const validatedData = rpc.validate({ ...data });
+        const id = String(data[foreignKey]);
 
         const typeData = this.data.get(type as string) || new Map();
-        typeData.set(String(data[foreignKey]), validatedData);
+        const previousData = typeData.get(id);
+        const isUpdate = typeData.has(id);
+
+        typeData.set(id, validatedData);
         this.data.set(type as string, typeData);
+
+        this.emitDataChangedEvent({
+            type,
+            payload: this.findAll(type)
+        });
 
         return validatedData;
     }
@@ -77,14 +90,16 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
             idFieldMap[path] = idField;
         }
 
+        let result: Array<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never>;
+
         if (Array.isArray(target)) {
-            return this.mergeArrayDeep(
+            result = this.mergeArrayDeep(
                 type,
                 this.arrayToRecord(type, target),
                 idFieldMap
             );
         } else if (typeof target === "object" && target !== null) {
-            return this.mergeArrayDeep(
+            result = this.mergeArrayDeep(
                 type,
                 target as Record<
                     string,
@@ -92,9 +107,18 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
                 >,
                 idFieldMap
             );
+        } else {
+            result = source;
         }
 
-        return source;
+        if (result.length > 0) {
+            this.emitDataChangedEvent({
+                type,
+                payload: this.findAll(type)
+            });
+        }
+
+        return result;
     }
 
     private arrayToRecord<T extends keyof TTypes>(
@@ -140,6 +164,11 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
         const typeData = this.data.get(type as string) || new Map();
         typeData.set(String(id), validatedData);
         this.data.set(type as string, typeData);
+
+        this.emitDataChangedEvent({
+            type,
+            payload: this.findAll(type)
+        });
 
         return validatedData;
     }
@@ -356,7 +385,17 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
 
     public remove<T extends keyof TTypes>(type: T, id: string | number) {
         const typeData = this.data.get(type as string) || new Map();
-        const result = typeData.delete(String(id));
+        const stringId = String(id);
+        const previousData = typeData.get(stringId);
+        const result = typeData.delete(stringId);
+        
+        if (result && previousData) {
+            this.emitDataChangedEvent({
+                type,
+                payload: this.findAll(type)
+            });
+        }
+        
         return result;
     }
 
@@ -852,6 +891,29 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
                 visited
             );
         }
+    }
+
+    public onDataChanged<TFilteredTypes extends keyof TTypes = keyof TTypes>(
+        listener: DataChangeListener<TTypes, TFilteredTypes>,
+        filter?: DataChangeFilter<TTypes>
+    ): string {
+        return this.eventEmitter.onDataChanged(listener, filter);
+    }
+
+    public offDataChanged(listenerId: string): boolean {
+        return this.eventEmitter.offDataChanged(listenerId);
+    }
+
+    public getDataChangedListenerCount(): number {
+        return this.eventEmitter.getDataChangedListenerCount();
+    }
+
+    public clearAllDataChangedListeners(): void {
+        this.eventEmitter.clearAllDataChangedListeners();
+    }
+
+    private emitDataChangedEvent(event: DataChangeEvent<TTypes>): void {
+        this.eventEmitter.emitDataChanged(event);
     }
 
     public handleMessages(

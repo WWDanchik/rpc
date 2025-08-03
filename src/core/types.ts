@@ -212,11 +212,17 @@ export type FieldNameMap = {
     [type: string]: string;
 };
 
-export type RelatedFieldNameMap<TTypes extends Record<string, Rpc<any>>, TCurrent extends keyof TTypes> = {
+export type RelatedFieldNameMap<
+    TTypes extends Record<string, Rpc<any>>,
+    TCurrent extends keyof TTypes
+> = {
     [K in keyof TTypes]: K extends TCurrent ? never : string;
 };
 
-export type RelatedTypes<TTypes extends Record<string, Rpc<any>>, T extends keyof TTypes> = {
+export type RelatedTypes<
+    TTypes extends Record<string, Rpc<any>>,
+    T extends keyof TTypes
+> = {
     [K in keyof TTypes]: K extends T ? never : K;
 }[keyof TTypes];
 
@@ -227,10 +233,85 @@ export type RelatedFieldsMapAuto = Partial<Record<string, string>>;
 export type Message<TTypes extends Record<string, Rpc<any>>> = {
     [K in keyof TTypes]: {
         type: K;
-        payload: 
-            | Record<string, Partial<TTypes[K] extends Rpc<infer S> ? z.infer<S> : never> | null>
+        payload:
+            | Record<
+                  string,
+                  Partial<
+                      TTypes[K] extends Rpc<infer S> ? z.infer<S> : never
+                  > | null
+              >
             | Array<TTypes[K] extends Rpc<infer S> ? z.infer<S> : never>;
     };
 }[keyof TTypes];
 
+export type DataChangeEvent<TTypes extends Record<string, Rpc<any>>> =
+    Message<TTypes>;
 
+export type DataChangeListener<
+    TTypes extends Record<string, Rpc<any>>,
+    TFilteredTypes extends keyof TTypes = keyof TTypes
+> = (
+    events: Array<{
+        [K in TFilteredTypes]: {
+            type: K;
+            payload: Array<TTypes[K] extends Rpc<infer S> ? z.infer<S> : never>;
+        };
+    }[TFilteredTypes]>
+) => void;
+
+export interface IDataChangeFilter<TTypes extends Record<string, Rpc<any>>> {
+    withRepository(repository: any): DataChangeBuilder<TTypes>;
+    withTypes<T extends keyof TTypes>(
+        types: T[]
+    ): IDataChangeListener<TTypes, T>;
+}
+
+export interface IDataChangeListener<
+    TTypes extends Record<string, Rpc<any>>,
+    TFilteredTypes extends keyof TTypes
+> {
+    onDataChanged(
+        listener: (
+            events: Array<{
+                [K in TFilteredTypes]: {
+                    type: K;
+                    payload: Array<TTypes[K] extends Rpc<infer S> ? z.infer<S> : never>;
+                };
+            }[TFilteredTypes]>
+        ) => void
+    ): string;
+}
+
+export class DataChangeBuilder<TTypes extends Record<string, Rpc<any>>>
+    implements IDataChangeFilter<TTypes>
+{
+    private repository?: any;
+
+    public static new<
+        TTypes extends Record<string, Rpc<any>>
+    >(): IDataChangeFilter<TTypes> {
+        return new DataChangeBuilder<TTypes>();
+    }
+
+    public withRepository(repository: any): DataChangeBuilder<TTypes> {
+        this.repository = repository;
+        return this;
+    }
+
+    withTypes<T extends keyof TTypes>(
+        types: T[]
+    ): IDataChangeListener<TTypes, T> {
+        return {
+            onDataChanged: (listener) => {
+                if (!this.repository) {
+                    throw new Error("Repository not set. Call withRepository() first.");
+                }
+                return this.repository.onDataChanged(listener, { types });
+            },
+        };
+    }
+}
+
+export type DataChangeFilter<TTypes extends Record<string, Rpc<any>>> = {
+    types?: Array<keyof TTypes>;
+};

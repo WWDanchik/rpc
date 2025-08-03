@@ -17,6 +17,7 @@ npm install @yunu-lab/rpc-ts
 - 🔄 **Глубокое слияние данных** - mergeRpc с поддержкой путей
 - 🎛️ **Продвинутые типы** - ArrayElementFields, RelationKey, ArrayFieldsRecord
 - 📡 **Асинхронные callback'и** - load, save, update, delete для каждого типа
+- 🔔 **Система событий** - отслеживание изменений данных в реальном времени
 
 ## Быстрый старт
 
@@ -319,6 +320,186 @@ type Message<TTypes extends Record<string, Rpc<any>>> = {
 }[keyof TTypes];
 ```
 
+## Система событий изменений данных
+
+Библиотека предоставляет мощную систему событий для отслеживания изменений данных в реальном времени. Это позволяет интегрировать RPC пакет с UI фреймворками, системами кэширования и другими компонентами.
+
+### Базовое использование
+
+```typescript
+// Слушатель всех изменений с полной типизацией
+const listenerId = repository.onDataChanged((events) => {
+    // events - массив событий (если изменилось несколько элементов сразу)
+    events.forEach(event => {
+        // event.type - автокомплит всех типов RPC
+        // event.payload - типизированный массив данных
+        console.log(`Изменение в ${event.type}:`, {
+            type: event.type,
+            payload: event.payload, // Полная типизация с автокомплитом
+            count: event.payload.length
+        });
+    });
+});
+
+// Удаление слушателя
+repository.offDataChanged(listenerId);
+```
+
+### Фильтрация событий
+
+```typescript
+// Слушатель только для определенного типа
+const userListenerId = repository.onDataChanged((events) => {
+    events.forEach(event => {
+        // event.type - только "user"
+        // event.payload - типизированный массив User[]
+        event.payload.forEach(user => {
+            console.log(user.name, user.email); // Полный автокомплит
+        });
+    });
+}, { types: ["user"] });
+
+// Слушатель для нескольких типов с DataChangeBuilder
+const multiTypeListenerId = DataChangeBuilder.new<RepositoryTypes<typeof repository>>()
+    .withRepository(repository)
+    .withTypes(["user", "order"])
+    .onDataChanged((events) => {
+        events.forEach(event => {
+            if (event.type === "user") {
+                event.payload.forEach(user => {
+                    console.log("User:", user.name); // Автокомплит полей User
+                });
+            } else if (event.type === "order") {
+                event.payload.forEach(order => {
+                    console.log("Order:", order.total); // Автокомплит полей Order
+                });
+            }
+        });
+    });
+```
+
+### Типы событий
+
+```typescript
+type DataChangeEvent<TTypes extends Record<string, Rpc<any>>> = Message<TTypes>;
+
+type DataChangeListener<TTypes extends Record<string, Rpc<any>>, TFilteredTypes extends keyof TTypes = keyof TTypes> = (
+    events: Array<{
+        [K in TFilteredTypes]: {
+            type: K;
+            payload: Array<TTypes[K] extends Rpc<infer S> ? z.infer<S> : never>;
+        };
+    }[TFilteredTypes]>
+) => void;
+
+type DataChangeFilter<TTypes extends Record<string, Rpc<any>>> = {
+    types?: Array<keyof TTypes>;  // Фильтр по типам
+};
+
+// Builder для создания типизированных слушателей
+class DataChangeBuilder<TTypes extends Record<string, Rpc<any>>> {
+    static new<TTypes>(): IDataChangeFilter<TTypes>;
+    withTypes<T extends keyof TTypes>(types: T[]): IDataChangeListener<TTypes, T>;
+}
+```
+
+### Управление слушателями
+
+```typescript
+// Получение количества активных слушателей
+const listenerCount = repository.getDataChangedListenerCount();
+
+// Очистка всех слушателей
+repository.clearAllDataChangedListeners();
+
+// Очистка конкретного слушателя
+repository.offDataChanged(listenerId);
+```
+
+### Пример интеграции с React
+
+```typescript
+import { useEffect, useState } from 'react';
+
+function useRepositoryData<T>(repository: RpcRepository, type: string, id?: number) {
+    const [data, setData] = useState<T | null>(null);
+
+    useEffect(() => {
+        // Загружаем начальные данные
+        if (id) {
+            const initialData = repository.findById(type, id);
+            setData(initialData);
+        } else {
+            const allData = repository.findAll(type);
+            setData(allData);
+        }
+
+        // Подписываемся на изменения с типизацией
+        const listenerId = repository.onDataChanged((event) => {
+            if (event.type === type) {
+                if (id) {
+                    // Обновляем конкретный элемент
+                    const updatedData = repository.findById(type, id);
+                    setData(updatedData);
+                } else {
+                    // Обновляем весь список с типизацией
+                    setData(event.payload as T);
+                }
+            }
+        }, { types: [type] });
+
+        // Очистка при размонтировании
+        return () => {
+            repository.offDataChanged(listenerId);
+        };
+    }, [repository, type, id]);
+
+    return data;
+}
+```
+
+### Пример интеграции с Vue
+
+```typescript
+import { ref, onMounted, onUnmounted } from 'vue';
+
+export function useRepositoryData<T>(repository: RpcRepository, type: string, id?: number) {
+    const data = ref<T | null>(null);
+
+    let listenerId: string;
+
+    onMounted(() => {
+        // Загружаем начальные данные
+        if (id) {
+            data.value = repository.findById(type, id);
+        } else {
+            data.value = repository.findAll(type);
+        }
+
+        // Подписываемся на изменения с типизацией
+        listenerId = repository.onDataChanged((event) => {
+            if (event.type === type) {
+                if (id) {
+                    data.value = repository.findById(type, id);
+                } else {
+                    data.value = event.payload as T;
+                }
+            }
+        }, { types: [type] });
+    });
+
+    onUnmounted(() => {
+        if (listenerId) {
+            repository.offDataChanged(listenerId);
+        }
+    });
+
+    return data;
+}
+```
+
+
+
 ## API Reference
 
 ### Rpc
@@ -411,6 +592,18 @@ class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
     handleMessages(
         messages: Array<Message<TTypes>>
     ): void;
+    
+    // Методы для работы с событиями изменений данных
+    onDataChanged(
+        listener: DataChangeListener<TTypes>,
+        filter?: DataChangeFilter<TTypes>
+    ): string;
+    
+    offDataChanged(listenerId: string): boolean;
+    
+    getDataChangedListenerCount(): number;
+    
+    clearAllDataChangedListeners(): void;
 }
 ```
 

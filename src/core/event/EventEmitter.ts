@@ -1,7 +1,23 @@
+import { Rpc } from "../rpc/Rpc";
+import {
+    DataChangeEvent,
+    DataChangeFilter,
+    DataChangeListener,
+} from "../types";
+
 export type Events = "dataChanged";
 
-export class EventEmitter {
+export class EventEmitter<
+    TTypes extends Record<string, Rpc<any>> = Record<string, Rpc<any>>
+> {
     private events = new Map<string, Function[]>();
+    private dataChangeListeners = new Map<
+        string,
+        DataChangeListener<TTypes>[]
+    >();
+    private dataChangeFilters = new Map<string, DataChangeFilter<TTypes>>();
+    private pendingEvents: Array<DataChangeEvent<TTypes>> = [];
+    private emitTimeout: NodeJS.Timeout | null = null;
 
     constructor() {}
 
@@ -43,5 +59,97 @@ export class EventEmitter {
             this.events.clear();
         }
         return this;
+    }
+
+    public onDataChanged<TFilteredTypes extends keyof TTypes = keyof TTypes>(
+        listener: DataChangeListener<TTypes, TFilteredTypes>,
+        filter?: DataChangeFilter<TTypes>
+    ): string {
+        const listenerId = this.generateListenerId();
+        this.dataChangeListeners.set(listenerId, [listener as any]);
+
+        if (filter) {
+            this.dataChangeFilters.set(listenerId, filter);
+        }
+
+        return listenerId;
+    }
+
+    public offDataChanged(listenerId: string): boolean {
+        const removed = this.dataChangeListeners.delete(listenerId);
+        this.dataChangeFilters.delete(listenerId);
+        return removed;
+    }
+
+    public emitDataChanged(event: DataChangeEvent<TTypes>): void {
+        this.pendingEvents.push(event);
+
+        if (this.emitTimeout) {
+            clearTimeout(this.emitTimeout);
+        }
+
+        this.emitTimeout = setTimeout(() => {
+            this.flushPendingEvents();
+        }, 0);
+    }
+
+    private flushPendingEvents(): void {
+        if (this.pendingEvents.length === 0) return;
+
+        const eventsToEmit = [...this.pendingEvents];
+        this.pendingEvents = [];
+
+        for (const [
+            listenerId,
+            listeners,
+        ] of this.dataChangeListeners.entries()) {
+            const filter = this.dataChangeFilters.get(listenerId);
+
+            const filteredEvents = eventsToEmit.filter((event) =>
+                this.shouldEmitToListener(event, filter)
+            );
+
+            if (filteredEvents.length > 0) {
+                listeners.forEach((listener) => {
+                    try {
+                        const typedEvents = filteredEvents.map((event) => ({
+                            type: event.type,
+                            payload: event.payload,
+                        }));
+                        listener(typedEvents as any);
+                    } catch (error) {
+                        console.error("Error in data change listener:", error);
+                    }
+                });
+            }
+        }
+    }
+
+    private shouldEmitToListener(
+        event: DataChangeEvent<TTypes>,
+        filter?: DataChangeFilter<TTypes>
+    ): boolean {
+        if (!filter) return true;
+
+        if (filter.types && !filter.types.includes(event.type)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private generateListenerId(): string {
+        return `listener_${Date.now()}_${Math.random()
+            .toString(36)
+            .substr(2, 9)}`;
+    }
+
+    public getDataChangedListenerCount(): number {
+        return this.dataChangeListeners.size;
+    }
+
+    public clearAllDataChangedListeners(): void {
+        this.dataChangeListeners.clear();
+        this.dataChangeFilters.clear();
     }
 }

@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { RpcRepository } from '../core/rpc/RpcRepository'
+import { RpcRepository, RepositoryTypes } from '../core/rpc/RpcRepository'
 import { Rpc } from '../core/rpc/Rpc'
 import z from 'zod'
+import { Message, DataChangeBuilder } from '../core/types'
 
 describe('RpcRepository', () => {
   let repository: any
@@ -323,3 +324,268 @@ describe('RpcRepository', () => {
     })
   })
 }) 
+
+describe("RpcRepository > data change events", () => {
+    let repository: any;
+
+    const userSchema = z.object({
+        id: z.number(),
+        name: z.string(),
+        email: z.string().email(),
+        age: z.number(),
+        isActive: z.boolean(),
+        createdAt: z.string(),
+    });
+
+    const postSchema = z.object({
+        id: z.number(),
+        title: z.string(),
+        content: z.string(),
+        userId: z.number(),
+        published: z.boolean(),
+        createdAt: z.string(),
+    });
+
+    const userRpc = new Rpc("user", userSchema, "id");
+    const postRpc = new Rpc("post", postSchema, "id");
+
+    beforeEach(() => {
+        repository = new RpcRepository()
+            .registerRpc("user", userRpc)
+            .registerRpc("post", postRpc);
+    });
+
+    it("should emit events when data is saved", async () => {
+        const events: Array<Message<any>> = [];
+        const listenerId = repository.onDataChanged((eventEvents) => {
+            events.push(...eventEvents);
+        });
+
+        repository.save("user", {
+            id: 1,
+            name: "John",
+            email: "john@example.com",
+            age: 30,
+            isActive: true,
+            createdAt: "2023-01-01",
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 10));
+
+        expect(events).toHaveLength(1);
+        expect(events[0].type).toBe("user");
+        expect(Array.isArray(events[0].payload)).toBe(true);
+        expect(events[0].payload).toHaveLength(1);
+
+        repository.offDataChanged(listenerId);
+    });
+
+    it("should emit events when data is updated", async () => {
+        const events: Array<Message<any>> = [];
+        const listenerId = repository.onDataChanged((eventEvents) => {
+            events.push(...eventEvents);
+        });
+
+        repository.save("user", {
+            id: 1,
+            name: "John",
+            email: "john@example.com",
+            age: 30,
+            isActive: true,
+            createdAt: "2023-01-01",
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 10));
+
+        repository.update("user", 1, {
+            name: "John Updated",
+            age: 31,
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 10));
+
+        expect(events).toHaveLength(2);
+        expect(events[1].type).toBe("user");
+        expect(Array.isArray(events[1].payload)).toBe(true);
+
+        repository.offDataChanged(listenerId);
+    });
+
+    it("should emit events when data is removed", async () => {
+        const events: Array<Message<any>> = [];
+        const listenerId = repository.onDataChanged((eventEvents) => {
+            events.push(...eventEvents);
+        });
+
+        repository.save("user", {
+            id: 1,
+            name: "John",
+            email: "john@example.com",
+            age: 30,
+            isActive: true,
+            createdAt: "2023-01-01",
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 10));
+
+        repository.remove("user", 1);
+
+        await new Promise(resolve => setTimeout(resolve, 10));
+
+        expect(events).toHaveLength(2);
+        expect(events[1].type).toBe("user");
+        expect(Array.isArray(events[1].payload)).toBe(true);
+
+        repository.offDataChanged(listenerId);
+    });
+
+    it("should filter events by type", async () => {
+        const userEvents: Array<Message<any>> = [];
+        const postEvents: Array<Message<any>> = [];
+        
+        const userListenerId = repository.onDataChanged((eventEvents) => {
+            userEvents.push(...eventEvents);
+        }, { types: ["user"] });
+
+        const postListenerId = repository.onDataChanged((eventEvents) => {
+            postEvents.push(...eventEvents);
+        }, { types: ["post"] });
+
+        repository.save("user", {
+            id: 1,
+            name: "John",
+            email: "john@example.com",
+            age: 30,
+            isActive: true,
+            createdAt: "2023-01-01",
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 10));
+
+        repository.save("post", {
+            id: 1,
+            title: "Test Post",
+            content: "Test Content",
+            userId: 1,
+            published: true,
+            createdAt: "2023-01-01",
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 10));
+
+        expect(userEvents).toHaveLength(1);
+        expect(userEvents[0].type).toBe("user");
+        expect(postEvents).toHaveLength(1);
+        expect(postEvents[0].type).toBe("post");
+
+        repository.offDataChanged(userListenerId);
+        repository.offDataChanged(postListenerId);
+    });
+
+    it("should batch multiple events", async () => {
+        const events: Array<Message<any>> = [];
+        const listenerId = repository.onDataChanged((eventEvents) => {
+            events.push(...eventEvents);
+        });
+
+        repository.save("user", {
+            id: 1,
+            name: "John",
+            email: "john@example.com",
+            age: 30,
+            isActive: true,
+            createdAt: "2023-01-01",
+        });
+
+        repository.save("user", {
+            id: 2,
+            name: "Jane",
+            email: "jane@example.com",
+            age: 25,
+            isActive: true,
+            createdAt: "2023-01-01",
+        });
+
+        repository.save("post", {
+            id: 1,
+            title: "Test Post",
+            content: "Test Content",
+            userId: 1,
+            published: true,
+            createdAt: "2023-01-01",
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 10));
+
+        expect(events).toHaveLength(3);
+        expect(events[0].type).toBe("user");
+        expect(events[1].type).toBe("user");
+        expect(events[2].type).toBe("post");
+
+        repository.offDataChanged(listenerId);
+    });
+
+    it("should return correct listener count", () => {
+        expect(repository.getDataChangedListenerCount()).toBe(0);
+
+        const listenerId1 = repository.onDataChanged(() => {});
+        expect(repository.getDataChangedListenerCount()).toBe(1);
+
+        const listenerId2 = repository.onDataChanged(() => {});
+        expect(repository.getDataChangedListenerCount()).toBe(2);
+
+        repository.offDataChanged(listenerId1);
+        expect(repository.getDataChangedListenerCount()).toBe(1);
+
+        repository.offDataChanged(listenerId2);
+        expect(repository.getDataChangedListenerCount()).toBe(0);
+    });
+
+    it("should clear all listeners", () => {
+        repository.onDataChanged(() => {});
+        repository.onDataChanged(() => {});
+        expect(repository.getDataChangedListenerCount()).toBe(2);
+
+        repository.clearAllDataChangedListeners();
+        expect(repository.getDataChangedListenerCount()).toBe(0);
+    });
+
+    it("should work with DataChangeBuilder", async () => {
+        const events: Array<Message<any>> = [];
+        
+        const listenerId = DataChangeBuilder.new<RepositoryTypes<typeof repository>>()
+            .withRepository(repository)
+            .withTypes(["user", "post"])
+            .onDataChanged((eventEvents) => {
+                events.push(...eventEvents);
+            });
+
+        repository.save("user", {
+            id: 1,
+            name: "John",
+            email: "john@example.com",
+            age: 30,
+            isActive: true,
+            createdAt: "2023-01-01",
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 10));
+
+        repository.save("post", {
+            id: 1,
+            title: "Test Post",
+            content: "Test Content",
+            userId: 1,
+            published: true,
+            createdAt: "2023-01-01",
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 10));
+
+        expect(events).toHaveLength(2);
+        expect(events[0].type).toBe("user");
+        expect(events[1].type).toBe("post");
+
+        repository.offDataChanged(listenerId);
+    });
+}); 

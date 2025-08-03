@@ -1,7 +1,7 @@
 import z from "zod";
 import { Rpc } from "../core/rpc/Rpc";
 import { RpcRepository, RepositoryTypes } from "../core/rpc/RpcRepository";
-import { Message } from "../core/types";
+import { Message, DataChangeBuilder } from "../core/types";
 import { log } from "console";
 
 const cellSchema = z.object({
@@ -435,3 +435,66 @@ rpcRepository.handleMessages(messages);
 
 console.log("Состояние после обработки сообщений:");
 console.log(JSON.stringify(rpcRepository.getState(), null, 2));
+
+console.log("\n=== Система событий изменений данных ===");
+
+const allChangesListenerId = rpcRepository.onDataChanged((events) => {
+    console.log(`[Все изменения] получено ${events.length} событий:`);
+    events.forEach(event => {
+        console.log(`  - ${String(event.type)}: ${event.payload.length} элементов`);
+    });
+});
+
+const cellListenerId = rpcRepository.onDataChanged((events) => {
+    console.log(`[Ячейки] получено ${events.length} событий:`);
+    events.forEach(event => {
+        console.log(`  - ${String(event.type)}: ${event.payload.length} элементов`);
+    });
+}, { types: ["cell"] });
+
+const multiTypeListenerId = DataChangeBuilder.new<RepositoryTypes<typeof rpcRepository>>()
+    .withTypes(["cell", "product"])
+    .onDataChanged((events) => {
+        console.log(`[Мульти-тип] получено ${events.length} событий:`);
+        events.forEach(event => {
+            if (event.type === "cell") {
+                event.payload.forEach(cell => {
+                    console.log(`Cell: ${cell.cell_name}`);
+                });
+            } else if (event.type === "product") {
+                event.payload.forEach(product => {
+                    console.log(`Product: ${product.name}`);
+                });
+            }
+        });
+    });
+
+console.log("Количество активных слушателей:", rpcRepository.getDataChangedListenerCount());
+
+console.log("\n--- Создание новых данных ---");
+rpcRepository.save("product", {
+    id: 4,
+    article: "ART006",
+    name: "Товар 4",
+    gravatar: "https://example.com/img6.jpg",
+    barcode_ids: [{ id: 6001 }],
+    is_stretched: true,
+});
+
+console.log("\n--- Обновление данных ---");
+await rpcRepository.update("cell", 1, {
+    cell_name: "Обновленная ячейка A1",
+    cell_value: "CELL_000999999"
+});
+
+console.log("\n--- Удаление данных ---");
+rpcRepository.remove("product", 2);
+
+console.log("\n--- Очистка слушателей ---");
+rpcRepository.offDataChanged(allChangesListenerId);
+rpcRepository.offDataChanged(cellListenerId);
+rpcRepository.offDataChanged(multiTypeListenerId);
+
+console.log("Количество активных слушателей после очистки:", rpcRepository.getDataChangedListenerCount());
+
+console.log("\n=== Пример завершен ===");
