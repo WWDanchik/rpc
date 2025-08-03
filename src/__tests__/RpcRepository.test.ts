@@ -310,6 +310,32 @@ describe('RpcRepository', () => {
       expect(bobUpdated?.name).toBe('Bob Updated')
       expect(jane?.name).toBe('Jane')
     })
+
+    it('should return correct count of remaining items after deletion', () => {
+      repository.save('user', { id: 1, name: 'John', email: 'john@example.com' })
+      repository.save('user', { id: 2, name: 'Jane', email: 'jane@example.com' })
+      repository.save('user', { id: 3, name: 'Bob', email: 'bob@example.com' })
+      repository.save('user', { id: 4, name: 'Alice', email: 'alice@example.com' })
+
+      const initialCount = repository.findAll('user').length
+      expect(initialCount).toBe(4)
+
+      const merged = repository.mergeRpc('user', {
+        '1': null,
+        '2': null,
+      })
+
+      expect(merged).toHaveLength(2)
+      
+      const remainingUsers = repository.findAll('user')
+      expect(remainingUsers).toHaveLength(2)
+      
+      const bob = remainingUsers.find(item => item.id === 3)
+      const alice = remainingUsers.find(item => item.id === 4)
+      
+      expect(bob?.name).toBe('Bob')
+      expect(alice?.name).toBe('Alice')
+    })
   })
 
   describe('handleMessages', () => {

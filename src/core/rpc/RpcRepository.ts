@@ -749,6 +749,8 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
             }
         }
 
+        const typeData = this.data.get(type as string) || new Map();
+        
         for (const item of result) {
             const rpc = this.getRpc(type);
             const foreignKey =
@@ -758,6 +760,15 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
             const id = item[foreignKey];
             if (id !== undefined) {
                 this.save(type, item);
+            }
+        }
+
+        const existingIds = new Set(Array.from(typeData.keys()));
+        const resultIds = new Set(result.map((item: any) => String(item[this.getIdFieldForPath(idFieldMap, "", "") || "id"])));
+        
+        for (const id of existingIds) {
+            if (!resultIds.has(id)) {
+                typeData.delete(id);
             }
         }
 
