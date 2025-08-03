@@ -1,7 +1,7 @@
 import z from "zod";
 import { Rpc } from "../core/rpc/Rpc";
 import { RpcRepository, RepositoryTypes } from "../core/rpc/RpcRepository";
-import { Message, DataChangeBuilder } from "../core/types";
+import { Message } from "../core/types";
 import { log } from "console";
 
 const cellSchema = z.object({
@@ -452,22 +452,20 @@ const cellListenerId = rpcRepository.onDataChanged((events) => {
     });
 }, { types: ["cell"] });
 
-const multiTypeListenerId = DataChangeBuilder.new<RepositoryTypes<typeof rpcRepository>>()
-    .withTypes(["cell", "product"])
-    .onDataChanged((events) => {
-        console.log(`[Мульти-тип] получено ${events.length} событий:`);
-        events.forEach(event => {
-            if (event.type === "cell") {
-                event.payload.forEach(cell => {
-                    console.log(`Cell: ${cell.cell_name}`);
-                });
-            } else if (event.type === "product") {
-                event.payload.forEach(product => {
-                    console.log(`Product: ${product.name}`);
-                });
-            }
-        });
+const multiTypeListenerId = rpcRepository.onDataChanged((events) => {
+    console.log(`[Мульти-тип] получено ${events.length} событий:`);
+    events.forEach(event => {
+        if (event.type === "cell") {
+            (event.payload as Cell[]).forEach(cell => {
+                console.log(`Cell: ${cell.cell_name}`);
+            });
+        } else if (event.type === "product") {
+            (event.payload as Product[]).forEach(product => {
+                console.log(`Product: ${product.name}`);
+            });
+        }
     });
+}, { types: ["cell", "product"] });
 
 console.log("Количество активных слушателей:", rpcRepository.getDataChangedListenerCount());
 

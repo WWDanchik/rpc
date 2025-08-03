@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { RpcRepository, RepositoryTypes } from '../core/rpc/RpcRepository'
 import { Rpc } from '../core/rpc/Rpc'
 import z from 'zod'
-import { Message, DataChangeBuilder } from '../core/types'
+import { Message } from '../core/types'
 
 describe('RpcRepository', () => {
   let repository: any
@@ -550,15 +550,12 @@ describe("RpcRepository > data change events", () => {
         expect(repository.getDataChangedListenerCount()).toBe(0);
     });
 
-    it("should work with DataChangeBuilder", async () => {
+    it("should work with filtered events", async () => {
         const events: Array<Message<any>> = [];
         
-        const listenerId = DataChangeBuilder.new<RepositoryTypes<typeof repository>>()
-            .withRepository(repository)
-            .withTypes(["user", "post"])
-            .onDataChanged((eventEvents) => {
-                events.push(...eventEvents);
-            });
+        const listenerId = repository.onDataChanged((eventEvents) => {
+            events.push(...eventEvents);
+        }, { types: ["user", "post"] });
 
         repository.save("user", {
             id: 1,

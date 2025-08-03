@@ -259,58 +259,7 @@ export type DataChangeListener<
     }[TFilteredTypes]>
 ) => void;
 
-export interface IDataChangeFilter<TTypes extends Record<string, Rpc<any>>> {
-    withRepository(repository: any): DataChangeBuilder<TTypes>;
-    withTypes<T extends keyof TTypes>(
-        types: T[]
-    ): IDataChangeListener<TTypes, T>;
-}
 
-export interface IDataChangeListener<
-    TTypes extends Record<string, Rpc<any>>,
-    TFilteredTypes extends keyof TTypes
-> {
-    onDataChanged(
-        listener: (
-            events: Array<{
-                [K in TFilteredTypes]: {
-                    type: K;
-                    payload: Array<TTypes[K] extends Rpc<infer S> ? z.infer<S> : never>;
-                };
-            }[TFilteredTypes]>
-        ) => void
-    ): string;
-}
-
-export class DataChangeBuilder<TTypes extends Record<string, Rpc<any>>>
-    implements IDataChangeFilter<TTypes>
-{
-    private repository?: any;
-
-    public static new<
-        TTypes extends Record<string, Rpc<any>>
-    >(): IDataChangeFilter<TTypes> {
-        return new DataChangeBuilder<TTypes>();
-    }
-
-    public withRepository(repository: any): DataChangeBuilder<TTypes> {
-        this.repository = repository;
-        return this;
-    }
-
-    withTypes<T extends keyof TTypes>(
-        types: T[]
-    ): IDataChangeListener<TTypes, T> {
-        return {
-            onDataChanged: (listener) => {
-                if (!this.repository) {
-                    throw new Error("Repository not set. Call withRepository() first.");
-                }
-                return this.repository.onDataChanged(listener, { types });
-            },
-        };
-    }
-}
 
 export type DataChangeFilter<TTypes extends Record<string, Rpc<any>>> = {
     types?: Array<keyof TTypes>;

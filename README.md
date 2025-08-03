@@ -359,23 +359,20 @@ const userListenerId = repository.onDataChanged((events) => {
     });
 }, { types: ["user"] });
 
-// Слушатель для нескольких типов с DataChangeBuilder
-const multiTypeListenerId = DataChangeBuilder.new<RepositoryTypes<typeof repository>>()
-    .withRepository(repository)
-    .withTypes(["user", "order"])
-    .onDataChanged((events) => {
-        events.forEach(event => {
-            if (event.type === "user") {
-                event.payload.forEach(user => {
-                    console.log("User:", user.name); // Автокомплит полей User
-                });
-            } else if (event.type === "order") {
-                event.payload.forEach(order => {
-                    console.log("Order:", order.total); // Автокомплит полей Order
-                });
-            }
-        });
+// Слушатель для нескольких типов с фильтрацией
+const multiTypeListenerId = repository.onDataChanged((events) => {
+    events.forEach(event => {
+        if (event.type === "user") {
+            (event.payload as User[]).forEach(user => {
+                console.log("User:", user.name); // Автокомплит полей User
+            });
+        } else if (event.type === "order") {
+            (event.payload as Order[]).forEach(order => {
+                console.log("Order:", order.total); // Автокомплит полей Order
+            });
+        }
     });
+}, { types: ["user", "order"] });
 ```
 
 ### Типы событий
@@ -396,11 +393,7 @@ type DataChangeFilter<TTypes extends Record<string, Rpc<any>>> = {
     types?: Array<keyof TTypes>;  // Фильтр по типам
 };
 
-// Builder для создания типизированных слушателей
-class DataChangeBuilder<TTypes extends Record<string, Rpc<any>>> {
-    static new<TTypes>(): IDataChangeFilter<TTypes>;
-    withTypes<T extends keyof TTypes>(types: T[]): IDataChangeListener<TTypes, T>;
-}
+
 ```
 
 ### Управление слушателями

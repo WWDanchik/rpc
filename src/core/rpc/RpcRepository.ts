@@ -56,8 +56,6 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
         const id = String(data[foreignKey]);
 
         const typeData = this.data.get(type as string) || new Map();
-        const previousData = typeData.get(id);
-        const isUpdate = typeData.has(id);
 
         typeData.set(id, validatedData);
         this.data.set(type as string, typeData);
