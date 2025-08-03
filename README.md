@@ -225,67 +225,6 @@ interface HierarchicalCell {
 const fullHierarchy = hierarchicalRepository.getFullRelatedData<HierarchicalCell>("hierarchical_cell", 1);
 ```
 
-## Обработка сообщений
-
-### handleMessages метод
-
-```typescript
-const messages: Array<{
-    type: "cell" | "rectangle" | "product";
-    payload: any;
-}> = [
-    {
-        type: "cell",
-        payload: {
-            1: {
-                cell_id: 1,
-                cell_name: "Обновленная ячейка A1",
-                cell_value: "CELL_000333333",
-                is_stretched: false,
-                products_ids: [{ id: 1 }, { id: 2 }],
-            },
-            2: {
-                cell_id: 2,
-                cell_name: "Новая ячейка B1",
-                cell_value: "CELL_000444444",
-                is_stretched: true,
-                products_ids: [{ id: 3 }],
-            },
-        },
-    },
-    {
-        type: "rectangle",
-        payload: {
-            1: {
-                id: 1,
-                name: "Обновленный прямоугольник",
-                width: 200,
-                height: 150,
-                cell_ids: [{ id: 1 }, { id: 2 }],
-            },
-        },
-    },
-    {
-        type: "product",
-        payload: [
-            {
-                id: 1,
-                name: "Продукт A",
-                price: 100,
-            },
-            {
-                id: 2,
-                name: "Продукт B",
-                price: 200,
-            },
-        ],
-    },
-];
-
-// Обработка массива сообщений
-rpcRepository.handleMessages(messages);
-```
-
 ## Глубокое слияние данных
 
 ### mergeRpc метод
