@@ -1,3 +1,4 @@
+import { RepositoryTypes } from "./../dist/core/rpc/RpcRepository.d";
 export { Rpc } from "./core/rpc/Rpc";
 export {
     RpcRepository,
@@ -19,10 +20,12 @@ export type {
 
 export { z } from "zod";
 
-export type { 
+export type {
     IdFieldMap,
     ArrayElementFields,
     RelationKey,
     ArrayFieldsRecord,
     LoadCallback,
 } from "./core/types";
+
+export type { RepositoryTypes };

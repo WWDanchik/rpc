@@ -1,16 +1,15 @@
 import z from "zod";
+import { EventEmitter } from "../event/EventEmitter";
 import {
-    IdFieldMap,
-    LoadCallback,
-    RelationKey,
-    RelationTree,
-    Message,
     DataChangeEvent,
     DataChangeListener,
-    DataChangeFilter,
+    IdFieldMap,
+    LoadCallback,
+    Message,
+    RelationKey,
+    RelationTree,
 } from "../types";
 import { Rpc } from "./Rpc";
-import { EventEmitter } from "../event/EventEmitter";
 
 export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
     private rpcs = new Map<string, Rpc<any>>();
@@ -773,6 +772,10 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
             throw new Error(`RPC type "${String(type)}" not registered`);
         }
         return rpc;
+    }
+
+    public getRpcTypes(): Record<string, Rpc<any>> {
+        return Object.fromEntries(this.rpcs);
     }
 
     public getFullRelation(): RelationTree {
