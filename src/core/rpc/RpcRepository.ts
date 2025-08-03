@@ -1,5 +1,14 @@
 import z from "zod";
-import { IdFieldMap, LoadCallback, RelationKey, RelationTree, Message, DataChangeEvent, DataChangeListener, DataChangeFilter } from "../types";
+import {
+    IdFieldMap,
+    LoadCallback,
+    RelationKey,
+    RelationTree,
+    Message,
+    DataChangeEvent,
+    DataChangeListener,
+    DataChangeFilter,
+} from "../types";
 import { Rpc } from "./Rpc";
 import { EventEmitter } from "../event/EventEmitter";
 
@@ -23,10 +32,10 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
         if (loadCallback) {
             this.loadCallbacks.set(name, loadCallback);
         }
-        return this as unknown as RpcRepository<TTypes & { [K in TName]: TRpc }>;
+        return this as unknown as RpcRepository<
+            TTypes & { [K in TName]: TRpc }
+        >;
     }
-
-
 
     public getState() {
         const state: Record<string, any> = {};
@@ -62,7 +71,7 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
 
         this.emitDataChangedEvent({
             type,
-            payload: this.findAll(type)
+            payload: this.findAll(type),
         });
 
         return validatedData;
@@ -112,7 +121,7 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
         if (result.length > 0) {
             this.emitDataChangedEvent({
                 type,
-                payload: this.findAll(type)
+                payload: this.findAll(type),
             });
         }
 
@@ -165,7 +174,7 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
 
         this.emitDataChangedEvent({
             type,
-            payload: this.findAll(type)
+            payload: this.findAll(type),
         });
 
         return validatedData;
@@ -277,9 +286,10 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
                     String(foreign.field),
                     String(foreign.key)
                 );
-                
-                sourceRpc.getRelatedFields()[targetType as string] = relatedFieldName;
-                
+
+                sourceRpc.getRelatedFields()[targetType as string] =
+                    relatedFieldName;
+
                 return this;
             },
             belongsTo: (foreign, localKey) => {
@@ -289,9 +299,10 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
                     String(foreign.field),
                     String(localKey)
                 );
-                
-                sourceRpc.getRelatedFields()[targetType as string] = relatedFieldName;
-                
+
+                sourceRpc.getRelatedFields()[targetType as string] =
+                    relatedFieldName;
+
                 return this;
             },
         };
@@ -314,18 +325,22 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
         if (!relation) return [];
 
         if (relation.relationType === "one-to-many") {
-            const sourceValue = (sourceRecord as any)[relation.localKey as string];
-            
+            const sourceValue = (sourceRecord as any)[
+                relation.localKey as string
+            ];
+
             if (Array.isArray(sourceValue)) {
                 const arrayKey = relation.arrayKey || "id";
-                
+
                 const targetIds = sourceValue.map((item: any) => {
                     return item[arrayKey] || item.id;
                 });
-                
+
                 return targetIds
-                    .map(id => this.findById(targetType, id))
-                    .filter(Boolean) as Array<TTypes[TTarget] extends Rpc<infer S> ? z.infer<S> : never>;
+                    .map((id) => this.findById(targetType, id))
+                    .filter(Boolean) as Array<
+                    TTypes[TTarget] extends Rpc<infer S> ? z.infer<S> : never
+                >;
             } else {
                 return this.findBy(
                     targetType,
@@ -386,14 +401,14 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
         const stringId = String(id);
         const previousData = typeData.get(stringId);
         const result = typeData.delete(stringId);
-        
+
         if (result && previousData) {
             this.emitDataChangedEvent({
                 type,
-                payload: this.findAll(type)
+                payload: this.findAll(type),
             });
         }
-        
+
         return result;
     }
 
@@ -779,11 +794,17 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
         if (id === undefined) {
             const allRecords = this.findAll(type);
             return allRecords
-                .map(record => {
-                    const recordId = (record as any)[this.getRpc(type).getForeignKey()];
-                    return this.getFullRelatedData<TResult>(type, recordId, visited);
+                .map((record) => {
+                    const recordId = (record as any)[
+                        this.getRpc(type).getForeignKey()
+                    ];
+                    return this.getFullRelatedData<TResult>(
+                        type,
+                        recordId,
+                        visited
+                    );
                 })
-                .filter(item => item !== null) as TResult[];
+                .filter((item) => item !== null) as TResult[];
         }
 
         const rootRecord = this.findById(type, id);
@@ -891,13 +912,24 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
         }
     }
 
-    public onDataChanged<TFilteredTypes extends keyof TTypes = keyof TTypes>(
-        listener: DataChangeListener<TTypes, TFilteredTypes>,
-        filter?: DataChangeFilter<TTypes>
-    ): string {
-        return this.eventEmitter.onDataChanged(listener, filter);
-    }
+    public onDataChanged(
+        listener: DataChangeListener<TTypes, keyof TTypes>
+    ): string;
+    public onDataChanged<const F extends readonly (keyof TTypes)[]>(
+        listener: DataChangeListener<TTypes, F[number]>,
+        filter: { types: F }
+    ): string;
 
+    public onDataChanged<const F extends readonly (keyof TTypes)[]>(
+        listener: DataChangeListener<TTypes, F[number]>,
+        filter?: { types: F }
+    ): string {
+        if (filter) {
+            return this.eventEmitter.onDataChanged(listener, filter);
+        } else {
+            return this.eventEmitter.onDataChanged(listener);
+        }
+    }
     public offDataChanged(listenerId: string): boolean {
         return this.eventEmitter.offDataChanged(listenerId);
     }
@@ -914,12 +946,10 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
         this.eventEmitter.emitDataChanged(event);
     }
 
-    public handleMessages(
-        messages: Array<Message<TTypes>>
-    ): void {
+    public handleMessages(messages: Array<Message<TTypes>>): void {
         for (const message of messages) {
             const { type, payload } = message;
-            
+
             if (this.rpcs.has(String(type))) {
                 this.mergeRpc(type, payload);
             } else {
@@ -943,4 +973,5 @@ export type RepositoryState<T extends RpcRepository<any>> = ReturnType<
     T["getState"]
 >;
 
-export type RepositoryTypes<T extends RpcRepository<any>> = T extends RpcRepository<infer U> ? U : never;
+export type RepositoryTypes<T extends RpcRepository<any>> =
+    T extends RpcRepository<infer U> ? U : never;

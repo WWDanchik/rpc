@@ -61,9 +61,18 @@ export class EventEmitter<
         return this;
     }
 
-    public onDataChanged<TFilteredTypes extends keyof TTypes = keyof TTypes>(
-        listener: DataChangeListener<TTypes, TFilteredTypes>,
-        filter?: DataChangeFilter<TTypes>
+    public onDataChanged(
+        listener: DataChangeListener<TTypes, keyof TTypes>
+    ): string;
+
+    public onDataChanged<const F extends readonly (keyof TTypes)[]>(
+        listener: DataChangeListener<TTypes, F[number]>,
+        filter: { types: F }
+    ): string;
+
+    public onDataChanged<const F extends readonly (keyof TTypes)[]>(
+        listener: DataChangeListener<TTypes, F[number]>,
+        filter?: { types: F }
     ): string {
         const listenerId = this.generateListenerId();
         this.dataChangeListeners.set(listenerId, [listener as any]);

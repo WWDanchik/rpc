@@ -249,18 +249,17 @@ export type DataChangeEvent<TTypes extends Record<string, Rpc<any>>> =
 
 export type DataChangeListener<
     TTypes extends Record<string, Rpc<any>>,
-    TFilteredTypes extends keyof TTypes = keyof TTypes
+    TKeys extends keyof TTypes = keyof TTypes
 > = (
     events: Array<{
-        [K in TFilteredTypes]: {
-            type: K;
-            payload: Array<TTypes[K] extends Rpc<infer S> ? z.infer<S> : never>;
-        };
-    }[TFilteredTypes]>
+        type: TKeys;
+        payload: Array<TTypes[TKeys] extends Rpc<infer S> ? z.infer<S> : never>;
+    }>
 ) => void;
 
-
-
-export type DataChangeFilter<TTypes extends Record<string, Rpc<any>>> = {
-    types?: Array<keyof TTypes>;
+export type DataChangeFilter<
+    TTypes extends Record<string, Rpc<any>>,
+    TKeys extends keyof TTypes = keyof TTypes
+> = {
+    types: readonly TKeys[];
 };

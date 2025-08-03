@@ -440,34 +440,37 @@ console.log("\n=== Система событий изменений данных
 
 const allChangesListenerId = rpcRepository.onDataChanged((events) => {
     console.log(`[Все изменения] получено ${events.length} событий:`);
-    events.forEach(event => {
-        console.log(`  - ${String(event.type)}: ${event.payload.length} элементов`);
+    events.forEach((event) => {
+        console.log(
+            `  - ${String(event.type)}: ${event.payload.length} элементов`
+        );
     });
 });
 
-const cellListenerId = rpcRepository.onDataChanged((events) => {
-    console.log(`[Ячейки] получено ${events.length} событий:`);
-    events.forEach(event => {
-        console.log(`  - ${String(event.type)}: ${event.payload.length} элементов`);
-    });
-}, { types: ["cell"] });
+const cellListenerId = rpcRepository.onDataChanged(
+    (events) => {
+        console.log(`[Ячейки] получено ${events.length} событий:`);
+        events.forEach((event) => {
+            console.log(
+                `  - ${String(event.type)}: ${event.payload.length} элементов`
+            );
+        });
+    },
+    { types: ["cell"] }
+);
 
-const multiTypeListenerId = rpcRepository.onDataChanged((events) => {
-    console.log(`[Мульти-тип] получено ${events.length} событий:`);
-    events.forEach(event => {
-        if (event.type === "cell") {
-            (event.payload as Cell[]).forEach(cell => {
-                console.log(`Cell: ${cell.cell_name}`);
-            });
-        } else if (event.type === "product") {
-            (event.payload as Product[]).forEach(product => {
-                console.log(`Product: ${product.name}`);
-            });
-        }
-    });
-}, { types: ["cell", "product"] });
+const multiTypeListenerId = rpcRepository.onDataChanged(
+    (events) => {
+        console.log(`[Мульти-тип] получено ${events.length} событий:`);
+        events.forEach((event) => {});
+    },
+    { types: ["cell", "product"] }
+);
 
-console.log("Количество активных слушателей:", rpcRepository.getDataChangedListenerCount());
+console.log(
+    "Количество активных слушателей:",
+    rpcRepository.getDataChangedListenerCount()
+);
 
 console.log("\n--- Создание новых данных ---");
 rpcRepository.save("product", {
@@ -482,7 +485,7 @@ rpcRepository.save("product", {
 console.log("\n--- Обновление данных ---");
 await rpcRepository.update("cell", 1, {
     cell_name: "Обновленная ячейка A1",
-    cell_value: "CELL_000999999"
+    cell_value: "CELL_000999999",
 });
 
 console.log("\n--- Удаление данных ---");
@@ -493,6 +496,9 @@ rpcRepository.offDataChanged(allChangesListenerId);
 rpcRepository.offDataChanged(cellListenerId);
 rpcRepository.offDataChanged(multiTypeListenerId);
 
-console.log("Количество активных слушателей после очистки:", rpcRepository.getDataChangedListenerCount());
+console.log(
+    "Количество активных слушателей после очистки:",
+    rpcRepository.getDataChangedListenerCount()
+);
 
 console.log("\n=== Пример завершен ===");
