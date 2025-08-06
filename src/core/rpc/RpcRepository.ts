@@ -5,6 +5,7 @@ import {
     DataChangeListener,
     IdFieldMap,
     LoadCallback,
+    MergeRpc,
     Message,
     RelationKey,
     RelationTree,
@@ -765,7 +766,7 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
 
         const existingIds = new Set(Array.from(typeData.keys()));
         const resultIds = new Set(result.map((item: any) => String(item[this.getIdFieldForPath(idFieldMap, "", "") || "id"])));
-        
+
         for (const id of existingIds) {
             if (!resultIds.has(id)) {
                 typeData.delete(id);
@@ -958,11 +959,17 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
         this.eventEmitter.emitDataChanged(event);
     }
 
-    public handleMessages(messages: Array<Message<TTypes>>): void {
+    public handleMessages(
+        messages: Array<Message<TTypes>>,
+        callbacks?: {
+            [K in keyof TTypes]?: (data: MergeRpc<TTypes>) => void;
+        }
+    ): void {
         for (const message of messages) {
             const { type, payload } = message;
 
             if (this.rpcs.has(String(type))) {
+                callbacks?.[type as keyof TTypes]?.(payload);
                 this.mergeRpc(type, payload);
             } else {
                 console.warn(`Unknown RPC type: ${String(type)}`);
