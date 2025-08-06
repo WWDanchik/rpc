@@ -4,6 +4,7 @@ import {
     DataChangeEvent,
     DataChangeListener,
     IdFieldMap,
+    InferRpcType,
     LoadCallback,
     MergeRpc,
     Message,
@@ -751,7 +752,7 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
         }
 
         const typeData = this.data.get(type as string) || new Map();
-        
+
         for (const item of result) {
             const rpc = this.getRpc(type);
             const foreignKey =
@@ -765,7 +766,11 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
         }
 
         const existingIds = new Set(Array.from(typeData.keys()));
-        const resultIds = new Set(result.map((item: any) => String(item[this.getIdFieldForPath(idFieldMap, "", "") || "id"])));
+        const resultIds = new Set(
+            result.map((item: any) =>
+                String(item[this.getIdFieldForPath(idFieldMap, "", "") || "id"])
+            )
+        );
 
         for (const id of existingIds) {
             if (!resultIds.has(id)) {
@@ -962,7 +967,11 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
     public handleMessages(
         messages: Array<Message<TTypes>>,
         callbacks?: {
-            [K in keyof TTypes]?: (data: MergeRpc<TTypes>) => void;
+            [K in keyof TTypes]?: (
+                data:
+                    | InferRpcType<TTypes[K]>[]
+                    | Record<string, Partial<InferRpcType<TTypes[K]>> | null>
+            ) => void;
         }
     ): void {
         for (const message of messages) {

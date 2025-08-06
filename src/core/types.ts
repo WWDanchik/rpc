@@ -273,3 +273,4 @@ export type MergeRpc<
           Partial<TTypes[K] extends Rpc<infer S> ? z.infer<S> : never> | null
       >
     | Array<TTypes[K] extends Rpc<infer S> ? z.infer<S> : never>;
+export type InferRpcType<T> = T extends Rpc<infer S> ? z.infer<S> : never;
