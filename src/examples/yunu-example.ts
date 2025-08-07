@@ -545,6 +545,7 @@ const singleSetting = rpcRepository.findById("settings", "any-id");
 console.log("Single setting:", JSON.stringify(singleSetting, null, 2));
 
 rpcRepository.save("settings", {
+    id: 1,
     theme: "light",
     language: "en",
     notifications: false,
