@@ -14,12 +14,12 @@ export class Rpc<TSchema extends z.ZodSchema = z.ZodSchema> {
     constructor(
         type: string,
         fields: TSchema,
-        foreignKey: ZodSchemaKeys<TSchema>
+        foreignKey?: ZodSchemaKeys<TSchema>
     ) {
         this.type = type;
         this.fields = fields;
         this.emitter = new EventEmitter();
-        this.foreignKey = foreignKey;
+        this.foreignKey = foreignKey || ("id" as ZodSchemaKeys<TSchema>);
         this.mergePath = {};
         this.relatedFields = {};
     }

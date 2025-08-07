@@ -6,10 +6,11 @@ import {
     IdFieldMap,
     InferRpcType,
     LoadCallback,
-    MergeRpc,
     Message,
     RelationKey,
     RelationTree,
+    RpcConfig,
+    StorageType,
 } from "../types";
 import { Rpc } from "./Rpc";
 
@@ -17,6 +18,7 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
     private rpcs = new Map<string, Rpc<any>>();
     private data = new Map<string, Map<string, any>>();
     private loadCallbacks = new Map<string, LoadCallback<any>>();
+    private storageTypes = new Map<string, StorageType>();
     private eventEmitter = new EventEmitter<TTypes>();
 
     constructor() {}
@@ -24,18 +26,25 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
     public registerRpc<TName extends string, TRpc extends Rpc<any>>(
         name: TName,
         rpc: TRpc,
-        loadCallback?: LoadCallback<
-            TRpc extends Rpc<infer S> ? z.infer<S> : never
-        >
+        config?: RpcConfig
     ): RpcRepository<TTypes & { [K in TName]: TRpc }> {
         this.rpcs.set(name, rpc);
         this.data.set(name, new Map());
-        if (loadCallback) {
-            this.loadCallbacks.set(name, loadCallback);
+        
+        const storageType = config?.storageType || "collection";
+        this.storageTypes.set(name, storageType);
+        
+        if (config?.loadCallback) {
+            this.loadCallbacks.set(name, config.loadCallback);
         }
+        
         return this as unknown as RpcRepository<
             TTypes & { [K in TName]: TRpc }
         >;
+    }
+
+    public getStorageType(type: string): StorageType {
+        return this.storageTypes.get(type) || "collection";
     }
 
     public getState() {
@@ -63,11 +72,18 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
             : never);
 
         const validatedData = rpc.validate({ ...data });
-        const id = String(data[foreignKey]);
-
+        const storageType = this.getStorageType(type as string);
+        
         const typeData = this.data.get(type as string) || new Map();
 
-        typeData.set(id, validatedData);
+        if (storageType === "singleton") {
+            typeData.clear();
+            typeData.set("singleton", validatedData);
+        } else {
+            const id = String(data[foreignKey]);
+            typeData.set(id, validatedData);
+        }
+        
         this.data.set(type as string, typeData);
 
         this.emitDataChangedEvent({
@@ -201,6 +217,13 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
         type: T
     ): Array<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never> {
         const typeData = this.data.get(type as string) || new Map();
+        const storageType = this.getStorageType(type as string);
+        
+        if (storageType === "singleton") {
+            const values = Array.from(typeData.values());
+            return values.length > 0 ? [values[0]] : [];
+        }
+
         return Array.from(typeData.values());
     }
 
@@ -209,7 +232,15 @@ export class RpcRepository<TTypes extends Record<string, Rpc<any>> = {}> {
         id: string | number
     ): (TTypes[T] extends Rpc<infer S> ? z.infer<S> : never) | null {
         const typeData = this.data.get(type as string) || new Map();
-        let result = typeData.get(String(id)) || null;
+        const storageType = this.getStorageType(type as string);
+        
+        let result: any = null;
+        
+        if (storageType === "singleton") {
+            result = typeData.get("singleton") || null;
+        } else {
+            result = typeData.get(String(id)) || null;
+        }
 
         if (!result) {
             const loadCallback = this.loadCallbacks.get(String(type));

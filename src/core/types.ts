@@ -3,6 +3,13 @@ import { Rpc } from "./rpc/Rpc";
 
 export type RelationType = "one-to-one" | "one-to-many" | "many-to-many";
 
+export type StorageType = "collection" | "singleton";
+
+export type RpcConfig = {
+    storageType?: StorageType;
+    loadCallback?: LoadCallback<any>;
+};
+
 export type ZodSchemaKeys<T extends z.ZodSchema> = keyof z.infer<T>;
 export type ZodSchemaType<T extends z.ZodSchema> = z.infer<T>;
 

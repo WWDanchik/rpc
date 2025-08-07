@@ -57,10 +57,20 @@ const rectangleRpc = new Rpc("rectangle", rectangleSchema, "id");
 
 const productRpc = new Rpc("product", productSchema, "id");
 
+const settingsSchema = z.object({
+    id: z.number(),
+    theme: z.string(),
+    language: z.string(),
+    notifications: z.boolean(),
+});
+
+const settingsRpc = new Rpc("settings", settingsSchema);
+
 const rpcRepository = new RpcRepository()
-    .registerRpc("cell", cellRpc)
-    .registerRpc("product", productRpc)
-    .registerRpc("rectangle", rectangleRpc);
+    .registerRpc("cell", cellRpc, { storageType: "collection" })
+    .registerRpc("product", productRpc, { storageType: "collection" })
+    .registerRpc("rectangle", rectangleRpc, { storageType: "collection" })
+    .registerRpc("settings", settingsRpc, { storageType: "singleton" });
 
 rpcRepository.defineRelation("rectangle", "cell", "cells").hasMany(
     {
@@ -502,3 +512,48 @@ console.log(
 );
 
 console.log("\n=== Пример завершен ===");
+
+console.log(
+    JSON.stringify(
+        cellRpc.createMessage({
+            1: {
+                cell_id: 1,
+                cell_name: "Ячейка A1",
+                cell_value: "CELL_000222222",
+                is_stretched: true,
+                products_ids: [{ id: 1 }],
+            },
+        }),
+        null,
+        2
+    )
+);
+
+console.log("\n=== Singleton Example ===");
+
+rpcRepository.save("settings", {
+    id: 1,
+    theme: "dark",
+    language: "ru",
+    notifications: true,
+});
+
+const settings = rpcRepository.findAll("settings");
+console.log("Settings (singleton):", JSON.stringify(settings, null, 2));
+
+const singleSetting = rpcRepository.findById("settings", "any-id");
+console.log("Single setting:", JSON.stringify(singleSetting, null, 2));
+
+rpcRepository.save("settings", {
+    theme: "light",
+    language: "en",
+    notifications: false,
+});
+
+const updatedSettings = rpcRepository.findAll("settings");
+console.log("Updated settings:", JSON.stringify(updatedSettings, null, 2));
+
+console.log("\n=== Collection vs Singleton Comparison ===");
+
+console.log("Cell storage type:", rpcRepository.getStorageType("cell"));
+console.log("Settings storage type:", rpcRepository.getStorageType("settings"));
