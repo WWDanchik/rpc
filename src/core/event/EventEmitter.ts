@@ -3,6 +3,7 @@ import {
     DataChangeEvent,
     DataChangeFilter,
     DataChangeListener,
+    StorageType,
 } from "../types";
 
 export type Events = "dataChanged";
@@ -13,7 +14,7 @@ export class EventEmitter<
     private events = new Map<string, Function[]>();
     private dataChangeListeners = new Map<
         string,
-        DataChangeListener<TTypes>[]
+        DataChangeListener<TTypes, any, any>[]
     >();
     private dataChangeFilters = new Map<string, DataChangeFilter<TTypes>>();
     private pendingEvents: Array<DataChangeEvent<TTypes>> = [];
@@ -61,18 +62,9 @@ export class EventEmitter<
         return this;
     }
 
-    public onDataChanged(
-        listener: DataChangeListener<TTypes, keyof TTypes>
-    ): string;
-
-    public onDataChanged<const F extends readonly (keyof TTypes)[]>(
-        listener: DataChangeListener<TTypes, F[number]>,
-        filter: { types: F }
-    ): string;
-
-    public onDataChanged<const F extends readonly (keyof TTypes)[]>(
-        listener: DataChangeListener<TTypes, F[number]>,
-        filter?: { types: F }
+    public onDataChanged<TRpcStorageType extends Record<string, StorageType>, const F extends readonly (keyof TTypes)[]>(
+        listener: DataChangeListener<TTypes, F[number], TRpcStorageType>,
+        filter?: { types: readonly (keyof TTypes)[] }
     ): string {
         const listenerId = this.generateListenerId();
         this.dataChangeListeners.set(listenerId, [listener as any]);

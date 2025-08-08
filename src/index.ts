@@ -39,3 +39,14 @@ export type {
 } from "./core/types";
 
 export { z } from "zod";
+
+export {
+    RpcStorageType,
+    InferRpcType,
+    InferRpcTypes,
+    CollectionKeys,
+    SingletonKeys,
+    createRpcStorageType,
+    isCollection,
+    isSingleton,
+} from "./core/utils/rpc-utils";

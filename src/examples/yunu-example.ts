@@ -1,7 +1,7 @@
 import z from "zod";
 import { Rpc } from "../core/rpc/Rpc";
 import { RpcRepository, RepositoryTypes } from "../core/rpc/RpcRepository";
-import { Message } from "../core/types";
+import { Message, StorageType } from "../core/types";
 import { log } from "console";
 
 const cellSchema = z.object({
@@ -64,13 +64,22 @@ const settingsSchema = z.object({
     notifications: z.boolean(),
 });
 
+const errorSchema = z.object({
+    code: z.enum(["AUTHENTICATION_ERROR"]),
+    msg: z.string(),
+    tech_msg: z.string(),
+    text_code: z.string(),
+});
+
 const settingsRpc = new Rpc("settings", settingsSchema);
+const errorRpc = new Rpc("error", errorSchema);
 
 const rpcRepository = new RpcRepository()
     .registerRpc("cell", cellRpc, { storageType: "collection" })
     .registerRpc("product", productRpc, { storageType: "collection" })
     .registerRpc("rectangle", rectangleRpc, { storageType: "collection" })
-    .registerRpc("settings", settingsRpc, { storageType: "singleton" });
+    .registerRpc("settings", settingsRpc, { storageType: "singleton" })
+    .registerRpc("error", errorRpc, { storageType: "singleton" });
 
 rpcRepository.defineRelation("rectangle", "cell", "cells").hasMany(
     {
@@ -277,7 +286,8 @@ const hierarchicalCellRpc = new Rpc(
 
 const hierarchicalRepository = new RpcRepository().registerRpc(
     "hierarchical_cell",
-    hierarchicalCellRpc
+    hierarchicalCellRpc,
+    { storageType: "collection" }
 );
 
 hierarchicalRepository
@@ -448,15 +458,6 @@ console.log(JSON.stringify(rpcRepository.getState(), null, 2));
 
 console.log("\n=== Система событий изменений данных ===");
 
-const allChangesListenerId = rpcRepository.onDataChanged((events) => {
-    console.log(`[Все изменения] получено ${events.length} событий:`);
-    events.forEach((event) => {
-        console.log(
-            `  - ${String(event.type)}: ${event.payload.length} элементов`
-        );
-    });
-});
-
 const cellListenerId = rpcRepository.onDataChanged(
     (events) => {
         console.log(`[Ячейки] получено ${events.length} событий:`);
@@ -502,7 +503,7 @@ console.log("\n--- Удаление данных ---");
 rpcRepository.remove("product", 2);
 
 console.log("\n--- Очистка слушателей ---");
-rpcRepository.offDataChanged(allChangesListenerId);
+
 rpcRepository.offDataChanged(cellListenerId);
 rpcRepository.offDataChanged(multiTypeListenerId);
 
@@ -558,3 +559,65 @@ console.log("\n=== Collection vs Singleton Comparison ===");
 
 console.log("Cell storage type:", rpcRepository.getStorageType("cell"));
 console.log("Settings storage type:", rpcRepository.getStorageType("settings"));
+
+console.log("\n=== Error Schema Singleton Example ===");
+
+console.log(
+    "Initial error:",
+    JSON.stringify(rpcRepository.findAll("error"), null, 2)
+);
+
+import { createRpcStorageType } from "../core/utils/rpc-utils";
+
+const RpcStorageType = createRpcStorageType({
+    cell: "collection",
+    product: "collection",
+    rectangle: "collection",
+    settings: "singleton",
+    error: "singleton",
+} as const);
+
+type RpcStorageType = typeof RpcStorageType;
+
+// Примеры использования утилит
+import {
+    CollectionKeys,
+    SingletonKeys,
+    isCollection,
+    isSingleton,
+} from "../core/utils/rpc-utils";
+
+// Ключи для разных типов
+type CollectionTypeKeys = CollectionKeys<RpcStorageType>; // "cell" | "product" | "rectangle"
+type SingletonTypeKeys = SingletonKeys<RpcStorageType>; // "settings" | "error"
+
+// Проверка типов
+const isCellCollection = isCollection(RpcStorageType, "cell"); // true
+const isErrorSingleton = isSingleton(RpcStorageType, "error"); // true
+
+const errorListenerId = rpcRepository.onDataChanged<RpcStorageType, ["error"]>(
+    (events) => {
+        events.forEach((event) => {
+            console.log(event);
+        });
+    },
+    {
+        types: ["error"],
+    }
+);
+
+console.log("\n=== Testing mergeRpc with singleton ===");
+
+setTimeout(() => {
+    rpcRepository.mergeRpc<"error", RpcStorageType>("error", {
+        code: "AUTHENTICATION_ERROR",
+        msg: "Обновленная ошибка аутентификации",
+        tech_msg: "Token expired",
+        text_code: "AUTH_002",
+    });
+}, 2000);
+
+console.log("\n=== Final state ===");
+
+const finalErrors = rpcRepository.findAll("error");
+console.log("Final errors:", JSON.stringify(finalErrors, null, 2));

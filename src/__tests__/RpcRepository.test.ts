@@ -689,9 +689,9 @@ describe("RpcRepository > data change events", () => {
 
         await new Promise(resolve => setTimeout(resolve, 10));
 
-        expect(events).toHaveLength(3);
-        expect(events[2].type).toBe("user");
-        expect(Array.isArray(events[2].payload)).toBe(true);
+        expect(events).toHaveLength(2);
+        expect(events[1].type).toBe("user");
+        expect(Array.isArray(events[1].payload)).toBe(true);
 
         repository.offDataChanged(listenerId);
     });

@@ -256,11 +256,16 @@ export type DataChangeEvent<TTypes extends Record<string, Rpc<any>>> =
 
 export type DataChangeListener<
     TTypes extends Record<string, Rpc<any>>,
-    TKeys extends keyof TTypes = keyof TTypes
+    TKeys extends keyof TTypes = keyof TTypes,
+    TStorageMap extends Record<string, StorageType> = Record<string, StorageType>
 > = (
     events: Array<{
         type: TKeys;
-        payload: Array<TTypes[TKeys] extends Rpc<infer S> ? z.infer<S> : never>;
+        payload: TKeys extends keyof TStorageMap 
+            ? TStorageMap[TKeys] extends "singleton" 
+                ? TTypes[TKeys] extends Rpc<infer S> ? z.infer<S> : never
+                : Array<TTypes[TKeys] extends Rpc<infer S> ? z.infer<S> : never>
+            : Array<TTypes[TKeys] extends Rpc<infer S> ? z.infer<S> : never>;
     }>
 ) => void;
 
@@ -270,6 +275,8 @@ export type DataChangeFilter<
 > = {
     types: readonly TKeys[];
 };
+
+export type AvailableTypes<TTypes extends Record<string, Rpc<any>>> = keyof TTypes;
 
 export type MergeRpc<
     TTypes extends Record<string, Rpc<any>>,
