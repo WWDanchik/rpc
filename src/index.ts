@@ -36,6 +36,9 @@ export type {
     RelatedTypes,
     RelationTree,
     RpcArrayPaths,
+    AvailableTypes,
+    RpcConfig,
+    StorageType,
 } from "./core/types";
 
 export { z } from "zod";
