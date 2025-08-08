@@ -27,6 +27,6 @@
     "noUncheckedSideEffectImports": true,
     "maxNodeModuleJsDepth": 0
   },
-  "include": ["src/index.ts"],
-  "exclude": ["dist", "node_modules", "**/*.test.ts", "**/*.spec.ts", "src/main.ts"]
+  "include": ["src/**/*"],
+  "exclude": ["dist", "node_modules", "**/*.test.ts", "**/*.spec.ts", "src/main.ts", "src/examples/**/*"]
 }

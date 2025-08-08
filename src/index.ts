@@ -6,10 +6,12 @@ export {
 } from "./core/rpc/RpcRepository";
 
 export { EventEmitter } from "./core/event/EventEmitter";
+
 export type {
     RepositoryState,
     RepositoryTypes,
 } from "./core/rpc/RpcRepository";
+
 export type {
     RelationType,
     RpcRelation,
@@ -45,13 +47,15 @@ export type {
 export { z } from "zod";
 
 export {
+    createRpcStorageType,
+    isCollection,
+    isSingleton,
+} from "./core/utils/rpc-utils";
+
+export type {
     RpcStorageType,
     InferRpcType,
     InferRpcTypes,
     CollectionKeys,
     SingletonKeys,
-    createRpcStorageType,
-    isCollection,
-    isSingleton,
-    
 } from "./core/utils/rpc-utils";

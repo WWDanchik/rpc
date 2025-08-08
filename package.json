@@ -17,26 +17,27 @@
     },
     "license": "MIT",
     "author": "Daniyar",
-    "type": "module",
     "exports": {
         ".": {
             "types": "./dist/index.d.ts",
-            "import": "./dist/index.es",
+            "import": "./dist/index.es.js",
             "require": "./dist/index.js"
         }
     },
     "main": "./dist/index.js",
-    "module": "./dist/index.es",
+    "module": "./dist/index.es.js",
     "types": "./dist/index.d.ts",
     "files": [
         "dist"
     ],
     "scripts": {
         "dev": "vite",
-        "build": "tsc && vite build",
+        "build": "npm run clean && tsc && npm run build:es",
         "build:lib": "tsc",
+        "build:es": "vite build",
+        "clean": "rm -rf dist",
         "preview": "vite preview",
-        "prepublishOnly": "npm run build:lib",
+        "prepublishOnly": "npm run build",
         "test": "vitest",
         "test:run": "vitest run",
         "prepare": "husky"
