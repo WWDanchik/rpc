@@ -1105,7 +1105,7 @@ export class RpcRepository<
         }
     ): void;
     public handleMessages<
-        RpcStorageType extends Record<keyof TTypes, StorageType> = Record<
+        _RpcStorageType extends Record<keyof TTypes, StorageType> = Record<
             keyof TTypes,
             StorageType
         >
