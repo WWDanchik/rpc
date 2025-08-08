@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { Rpc, StorageType } from "../types";
-import { RpcRepository } from "../rpc/RpcRepository";
+import { StorageType } from "../types";
+import { Rpc } from "../rpc/Rpc";
 
 export type RpcStorageType = Record<string, StorageType>;
 

@@ -58,8 +58,8 @@ export class RpcRepository<
         T extends keyof TTypes,
         RpcStorageType extends Record<keyof TTypes, StorageType>
     >(
-        key: T,
-        data: RpcStorageType[T] extends "collection"
+        _key: T,
+        _data: RpcStorageType[T] extends "collection"
             ? Array<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never>
             : RpcStorageType[T] extends "singleton"
             ? TTypes[T] extends Rpc<infer S>
@@ -137,19 +137,24 @@ export class RpcRepository<
     >(
         type: T,
         target: RpcStorageType[T] extends "collection"
-            ? Record<
-                  string,
-                  Partial<
-                      TTypes[T] extends Rpc<infer S> ? z.infer<S> : never
-                  > | null
-              > | Array<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never>
+            ?
+                  | Record<
+                        string,
+                        Partial<
+                            TTypes[T] extends Rpc<infer S> ? z.infer<S> : never
+                        > | null
+                    >
+                  | Array<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never>
             : RpcStorageType[T] extends "singleton"
             ? Partial<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never>
             : never
     ): Array<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never>;
     public mergeRpc<
         T extends keyof TTypes,
-        RpcStorageType extends Record<keyof TTypes, StorageType> = Record<keyof TTypes, StorageType>
+        _RpcStorageType extends Record<keyof TTypes, StorageType> = Record<
+            keyof TTypes,
+            StorageType
+        >
     >(
         type: T,
         target:
@@ -194,31 +199,31 @@ export class RpcRepository<
                     >,
                     idFieldMap
                 );
-                            } else {
-                    const storageType = this.getStorageType(type as string);
-                    if (storageType === "singleton") {
-                        const existing = this.findAll(type);
-                        const merged =
-                            existing.length > 0
-                                ? { ...(existing[0] as any), ...(target as any) }
-                                : target;
-                        this.save(type, merged as any);
-                        result = this.findAll(type);
-                    } else {
-                        result = source;
-                        this.emitDataChangedEvent({
-                            type,
-                            payload: this.findAll(type),
-                        });
-                    }
-                }
             } else {
-                result = source;
-                this.emitDataChangedEvent({
-                    type,
-                    payload: this.findAll(type),
-                });
+                const storageType = this.getStorageType(type as string);
+                if (storageType === "singleton") {
+                    const existing = this.findAll(type);
+                    const merged =
+                        existing.length > 0
+                            ? { ...(existing[0] as any), ...(target as any) }
+                            : target;
+                    this.save(type, merged as any);
+                    result = this.findAll(type);
+                } else {
+                    result = source;
+                    this.emitDataChangedEvent({
+                        type,
+                        payload: this.findAll(type),
+                    });
+                }
             }
+        } else {
+            result = source;
+            this.emitDataChangedEvent({
+                type,
+                payload: this.findAll(type),
+            });
+        }
 
         return result;
     }
@@ -1071,6 +1076,40 @@ export class RpcRepository<
     }
 
     public handleMessages(
+        messages: Array<Message<TTypes>>,
+        callbacks?: {
+            [K in keyof TTypes]?: (
+                data:
+                    | InferRpcType<TTypes[K]>[]
+                    | Record<string, Partial<InferRpcType<TTypes[K]>> | null>
+            ) => void;
+        }
+    ): void;
+    public handleMessages<
+        RpcStorageType extends Record<keyof TTypes, StorageType>
+    >(
+        messages: Array<Message<TTypes>>,
+        callbacks?: {
+            [K in keyof TTypes]?: (
+                data: RpcStorageType[K] extends "collection"
+                    ?
+                          | Record<
+                                string,
+                                Partial<InferRpcType<TTypes[K]>> | null
+                            >
+                          | Array<InferRpcType<TTypes[K]>>
+                    : RpcStorageType[K] extends "singleton"
+                    ? Partial<InferRpcType<TTypes[K]>>
+                    : never
+            ) => void;
+        }
+    ): void;
+    public handleMessages<
+        RpcStorageType extends Record<keyof TTypes, StorageType> = Record<
+            keyof TTypes,
+            StorageType
+        >
+    >(
         messages: Array<Message<TTypes>>,
         callbacks?: {
             [K in keyof TTypes]?: (

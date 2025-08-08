@@ -617,6 +617,15 @@ setTimeout(() => {
     });
 }, 2000);
 
+rpcRepository.handleMessages<RpcStorageType>(messages, {
+    error: (data) => {
+        // data будет Partial<ErrorType> для singleton
+    },
+    cell: (data) => {
+        // data будет Array<CellType> | Record<string, Partial<CellType> | null> для collection
+    },
+});
+
 console.log("\n=== Final state ===");
 
 const finalErrors = rpcRepository.findAll("error");
