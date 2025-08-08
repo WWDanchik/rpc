@@ -251,6 +251,25 @@ export type Message<TTypes extends Record<string, Rpc<any>>> = {
     };
 }[keyof TTypes];
 
+export type MessageWithStorageType<
+    TTypes extends Record<string, Rpc<any>>,
+    TStorageType extends Record<keyof TTypes, StorageType>
+> = {
+    [K in keyof TTypes]: {
+        type: K;
+        payload: TStorageType[K] extends "collection"
+            ? Record<
+                  string,
+                  Partial<
+                      TTypes[K] extends Rpc<infer S> ? z.infer<S> : never
+                  > | null
+              > | Array<TTypes[K] extends Rpc<infer S> ? z.infer<S> : never>
+            : TStorageType[K] extends "singleton"
+            ? Partial<TTypes[K] extends Rpc<infer S> ? z.infer<S> : never>
+            : never;
+    };
+}[keyof TTypes];
+
 export type DataChangeEvent<TTypes extends Record<string, Rpc<any>>> =
     Message<TTypes>;
 

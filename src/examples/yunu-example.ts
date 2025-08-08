@@ -1,7 +1,7 @@
 import z from "zod";
 import { Rpc } from "../core/rpc/Rpc";
 import { RpcRepository, RepositoryTypes } from "../core/rpc/RpcRepository";
-import { Message, StorageType } from "../core/types";
+import { Message, MessageWithStorageType, StorageType } from "../core/types";
 import { log } from "console";
 
 const cellSchema = z.object({
@@ -67,8 +67,8 @@ const settingsSchema = z.object({
 const errorSchema = z.object({
     code: z.enum(["AUTHENTICATION_ERROR"]),
     msg: z.string(),
-    tech_msg: z.string(),
-    text_code: z.string(),
+    tech_msg: z.string().optional(),
+    text_code: z.string().optional(),
 });
 
 const settingsRpc = new Rpc("settings", settingsSchema);
@@ -384,74 +384,23 @@ console.log(
     )
 );
 
-const messages: Array<Message<RepositoryTypes<typeof rpcRepository>>> = [
+const messages: Array<
+    MessageWithStorageType<
+        RepositoryTypes<typeof rpcRepository>,
+        RpcStorageType
+    >
+> = [
     {
-        type: "cell",
+        type: "error",
         payload: {
-            1: {
-                cell_id: 1,
-                cell_name: "Обновленная ячейка A1",
-                cell_value: "CELL_000333333",
-                is_stretched: false,
-                products_ids: [{ id: 1 }, { id: 2 }],
-            },
-            2: {
-                cell_id: 2,
-                cell_name: "Новая ячейка B1",
-                cell_value: "CELL_000444444",
-                is_stretched: true,
-                products_ids: [{ id: 3 }],
-            },
+            code: "AUTHENTICATION_ERROR",
+            msg: "Обновленная ошибка аутентификации",
         },
-    },
-    {
-        type: "rectangle",
-        payload: {
-            1: {
-                id: 1,
-                cell_ids: [{ id: 1 }, { id: 2 }],
-                map_cells: {
-                    pos_1_1: {
-                        id: 101,
-                        type: "pallet" as const,
-                    },
-                },
-            },
-        },
-    },
-    {
-        type: "product",
-        payload: [
-            {
-                id: 1,
-                article: "ART003",
-                name: "Продукт A",
-                gravatar: "https://example.com/img3.jpg",
-                barcode_ids: [{ id: 3001 }],
-                is_stretched: false,
-            },
-            {
-                id: 2,
-                article: "ART004",
-                name: "Продукт B",
-                gravatar: "https://example.com/img4.jpg",
-                barcode_ids: [{ id: 4001 }],
-                is_stretched: true,
-            },
-            {
-                id: 3,
-                article: "ART005",
-                name: "Продукт C",
-                gravatar: "https://example.com/img5.jpg",
-                barcode_ids: [{ id: 5001 }],
-                is_stretched: false,
-            },
-        ],
     },
 ];
 
 console.log("Обработка массива сообщений:");
-rpcRepository.handleMessages(messages);
+rpcRepository.handleMessages(messages, {});
 
 console.log("Состояние после обработки сообщений:");
 console.log(JSON.stringify(rpcRepository.getState(), null, 2));
@@ -605,25 +554,10 @@ const errorListenerId = rpcRepository.onDataChanged<RpcStorageType, ["error"]>(
         types: ["error"],
     }
 );
-
-console.log("\n=== Testing mergeRpc with singleton ===");
-
-setTimeout(() => {
-    rpcRepository.mergeRpc<"error", RpcStorageType>("error", {
-        code: "AUTHENTICATION_ERROR",
-        msg: "Обновленная ошибка аутентификации",
-        tech_msg: "Token expired",
-        text_code: "AUTH_002",
+rpcRepository.onDataChanged<RpcStorageType, []>((events) => {
+    events.forEach((event) => {
+        console.log(event);
     });
-}, 2000);
-
-rpcRepository.handleMessages<RpcStorageType>(messages, {
-    error: (data) => {
-        // data будет Partial<ErrorType> для singleton
-    },
-    cell: (data) => {
-        // data будет Array<CellType> | Record<string, Partial<CellType> | null> для collection
-    },
 });
 
 console.log("\n=== Final state ===");

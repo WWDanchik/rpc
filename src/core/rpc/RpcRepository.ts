@@ -7,6 +7,7 @@ import {
     InferRpcType,
     LoadCallback,
     Message,
+    MessageWithStorageType,
     RelationKey,
     RelationTree,
     RpcConfig,
@@ -209,6 +210,11 @@ export class RpcRepository<
                             : target;
                     this.save(type, merged as any);
                     result = this.findAll(type);
+                    
+                    this.emitDataChangedEvent({
+                        type,
+                        payload: existing.length > 0 ? existing[0] : merged,
+                    });
                 } else {
                     result = source;
                     this.emitDataChangedEvent({
@@ -219,10 +225,6 @@ export class RpcRepository<
             }
         } else {
             result = source;
-            this.emitDataChangedEvent({
-                type,
-                payload: this.findAll(type),
-            });
         }
 
         return result;
@@ -1077,6 +1079,16 @@ export class RpcRepository<
 
     public handleMessages(
         messages: Array<Message<TTypes>>,
+        callbacks?: {
+            [K in keyof TTypes]?: (
+                data:
+                    | InferRpcType<TTypes[K]>[]
+                    | Record<string, Partial<InferRpcType<TTypes[K]>> | null>
+            ) => void;
+        }
+    ): void;
+    public handleMessages(
+        messages: Array<MessageWithStorageType<TTypes, any>>,
         callbacks?: {
             [K in keyof TTypes]?: (
                 data:

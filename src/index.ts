@@ -17,6 +17,7 @@ export type {
     ZodSchemaKeys,
     ZodSchemaType,
     Message,
+    MessageWithStorageType,
     IdFieldMap,
     ArrayElementFields,
     RelationKey,
@@ -52,4 +53,5 @@ export {
     createRpcStorageType,
     isCollection,
     isSingleton,
+    
 } from "./core/utils/rpc-utils";
