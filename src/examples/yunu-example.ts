@@ -148,18 +148,6 @@ rpcRepository.save("cell", {
     ],
 });
 
-rpcRepository.save("cell", {
-    cell_id: 2,
-    cell_name: "Ячейка B1",
-    cell_value: "CELL_000333213",
-    is_stretched: false,
-    products_ids: [
-        {
-            id: 2,
-        },
-    ],
-});
-
 rpcRepository.save("rectangle", {
     id: 1,
     cell_ids: [
@@ -233,40 +221,6 @@ async function getAllRectanglesWithData(): Promise<RectangleWithData[]> {
     );
 
     return rectanglesWithData;
-}
-
-getAllRectanglesWithData().then((rectanglesWithAllData) => {
-    console.log(JSON.stringify(rectanglesWithAllData, null, 2));
-});
-
-const relationTree = rpcRepository.getFullRelation();
-console.log("Дерево связей:");
-console.log(JSON.stringify(relationTree, null, 2));
-
-const fullRelatedRectangleData = rpcRepository.getFullRelatedData(
-    "rectangle",
-    1
-);
-const fullRelatedCellData = rpcRepository.getFullRelatedData("cell", 1);
-const allCellsWithRelations = rpcRepository.getFullRelatedData("cell");
-
-console.log("Cell with relations:", fullRelatedCellData);
-console.log("All cells with relations:", allCellsWithRelations);
-const fullRelatedProductData = rpcRepository.getFullRelatedData("product", 1);
-
-if (fullRelatedRectangleData) {
-    console.log("Rectangle с полными данными:");
-    console.log(JSON.stringify(fullRelatedRectangleData, null, 2));
-}
-
-if (fullRelatedCellData) {
-    console.log("Cell с полными данными:");
-    console.log(JSON.stringify(fullRelatedCellData, null, 2));
-}
-
-if (fullRelatedProductData) {
-    console.log("Product с полными данными:");
-    console.log(JSON.stringify(fullRelatedProductData, null, 2));
 }
 
 console.log("\n=== Рекурсивная связь cell -> cell ===");
@@ -352,80 +306,10 @@ console.log(
     JSON.stringify(allCellsWithHierarchy, null, 2)
 );
 
-console.log(
-    JSON.stringify(
-        cellRpc.createMessage({
-            1: {
-                cell_id: 1,
-                cell_name: "Ячейка A1",
-                cell_value: "CELL_000222222",
-                is_stretched: true,
-                products_ids: [{ id: 1 }],
-            },
-        }),
-        null,
-        2
-    )
-);
-
-console.log(
-    JSON.stringify(
-        cellRpc.createMessage({
-            1: {
-                cell_id: 1,
-                cell_name: "Ячейка A1",
-                cell_value: "CELL_000222222",
-                is_stretched: true,
-                products_ids: [{ id: 1 }],
-            },
-        }),
-        null,
-        2
-    )
-);
-
-const messages: Array<
-    MessageWithStorageType<
-        RepositoryTypes<typeof rpcRepository>,
-        RpcStorageType
-    >
-> = [
-    {
-        type: "error",
-        payload: {
-            code: "AUTHENTICATION_ERROR",
-            msg: "Обновленная ошибка аутентификации",
-        },
-    },
-];
-
-console.log("Обработка массива сообщений:");
-rpcRepository.handleMessages(messages, {});
-
 console.log("Состояние после обработки сообщений:");
 console.log(JSON.stringify(rpcRepository.getState(), null, 2));
 
 console.log("\n=== Система событий изменений данных ===");
-
-const cellListenerId = rpcRepository.onDataChanged(
-    (events) => {
-        console.log(`[Ячейки] получено ${events.length} событий:`);
-        events.forEach((event) => {
-            console.log(
-                `  - ${String(event.type)}: ${event.payload.length} элементов`
-            );
-        });
-    },
-    { types: ["cell"] }
-);
-
-const multiTypeListenerId = rpcRepository.onDataChanged(
-    (events) => {
-        console.log(`[Мульти-тип] получено ${events.length} событий:`);
-        events.forEach((event) => {});
-    },
-    { types: ["cell", "product"] }
-);
 
 console.log(
     "Количество активных слушателей:",
@@ -442,41 +326,14 @@ rpcRepository.save("product", {
     is_stretched: true,
 });
 
-console.log("\n--- Обновление данных ---");
-await rpcRepository.update("cell", 1, {
-    cell_name: "Обновленная ячейка A1",
-    cell_value: "CELL_000999999",
-});
-
 console.log("\n--- Удаление данных ---");
 rpcRepository.remove("product", 2);
 
 console.log("\n--- Очистка слушателей ---");
 
-rpcRepository.offDataChanged(cellListenerId);
-rpcRepository.offDataChanged(multiTypeListenerId);
-
 console.log(
     "Количество активных слушателей после очистки:",
     rpcRepository.getDataChangedListenerCount()
-);
-
-console.log("\n=== Пример завершен ===");
-
-console.log(
-    JSON.stringify(
-        cellRpc.createMessage({
-            1: {
-                cell_id: 1,
-                cell_name: "Ячейка A1",
-                cell_value: "CELL_000222222",
-                is_stretched: true,
-                products_ids: [{ id: 1 }],
-            },
-        }),
-        null,
-        2
-    )
 );
 
 console.log("\n=== Singleton Example ===");
@@ -540,27 +397,17 @@ import {
 type CollectionTypeKeys = CollectionKeys<RpcStorageType>; // "cell" | "product" | "rectangle"
 type SingletonTypeKeys = SingletonKeys<RpcStorageType>; // "settings" | "error"
 
-// Проверка типов
-const isCellCollection = isCollection(RpcStorageType, "cell"); // true
-const isErrorSingleton = isSingleton(RpcStorageType, "error"); // true
+setTimeout(() => {
+    rpcRepository.mergeRpc("cell", {
+        1: null,
+    });
+}, 3000);
 
-const errorListenerId = rpcRepository.onDataChanged<RpcStorageType, ["error"]>(
+rpcRepository.onDataChanged<RpcStorageType, ["cell"]>(
     (events) => {
-        events.forEach((event) => {
-            console.log(event);
-        });
+        console.log(events);
     },
     {
-        types: ["error"],
+        types: ["cell"],
     }
 );
-rpcRepository.onDataChanged<RpcStorageType, []>((events) => {
-    events.forEach((event) => {
-        console.log(event);
-    });
-});
-
-console.log("\n=== Final state ===");
-
-const finalErrors = rpcRepository.findAll("error");
-console.log("Final errors:", JSON.stringify(finalErrors, null, 2));

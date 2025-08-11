@@ -584,10 +584,10 @@ describe("RpcRepository > data change events", () => {
 
         await new Promise(resolve => setTimeout(resolve, 10));
 
-        expect(events).toHaveLength(3);
+        expect(events).toHaveLength(2);
         expect(events[0].type).toBe("user");
-        expect(events[1].type).toBe("user");
-        expect(events[2].type).toBe("post");
+
+        expect(events[1].type).toBe("post");
 
         repository.offDataChanged(listenerId);
     });
@@ -680,7 +680,7 @@ describe("RpcRepository > data change events", () => {
 
         await new Promise(resolve => setTimeout(resolve, 10));
 
-        expect(events).toHaveLength(2);
+        expect(events).toHaveLength(1);
 
         repository.mergeRpc("user", {
             "1": null,
@@ -732,7 +732,7 @@ describe("RpcRepository > data change events", () => {
 
         await new Promise(resolve => setTimeout(resolve, 10));
 
-        expect(events).toHaveLength(3);
+        expect(events).toHaveLength(1);
 
         repository.mergeRpc("user", {
             "1": { name: "John Updated" },
@@ -742,7 +742,7 @@ describe("RpcRepository > data change events", () => {
 
         await new Promise(resolve => setTimeout(resolve, 10));
 
-        expect(events.length).toBeGreaterThan(3);
+        expect(events.length).toBeGreaterThan(1);
         const lastEvent = events[events.length - 1];
         expect(lastEvent.type).toBe("user");
         expect(Array.isArray(lastEvent.payload)).toBe(true);

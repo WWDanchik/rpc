@@ -100,13 +100,16 @@ export class EventEmitter<
         const eventsToEmit = [...this.pendingEvents];
         this.pendingEvents = [];
 
-        for (const [
-            listenerId,
-            listeners,
-        ] of this.dataChangeListeners.entries()) {
+        const latestByType = new Map<any, DataChangeEvent<TTypes>>();
+        for (const event of eventsToEmit) {
+            latestByType.set(event.type as any, event);
+        }
+        const dedupedEvents = Array.from(latestByType.values());
+
+        for (const [listenerId, listeners] of this.dataChangeListeners.entries()) {
             const filter = this.dataChangeFilters.get(listenerId);
 
-            const filteredEvents = eventsToEmit.filter((event) =>
+            const filteredEvents = dedupedEvents.filter((event) =>
                 this.shouldEmitToListener(event, filter)
             );
 

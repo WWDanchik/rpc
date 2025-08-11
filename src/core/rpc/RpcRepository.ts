@@ -200,6 +200,10 @@ export class RpcRepository<
                     >,
                     idFieldMap
                 );
+                this.emitDataChangedEvent({
+                    type,
+                    payload: this.findAll(type),
+                });
             } else {
                 const storageType = this.getStorageType(type as string);
                 if (storageType === "singleton") {
@@ -210,7 +214,7 @@ export class RpcRepository<
                             : target;
                     this.save(type, merged as any);
                     result = this.findAll(type);
-                    
+
                     this.emitDataChangedEvent({
                         type,
                         payload: existing.length > 0 ? existing[0] : merged,
