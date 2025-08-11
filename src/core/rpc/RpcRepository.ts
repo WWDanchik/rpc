@@ -212,20 +212,38 @@ export class RpcRepository<
             const hasNumericKeys = keys.every((key) => !isNaN(Number(key)));
 
             if (hasNumericKeys) {
-                result = this.mergeArrayDeep(
-                    type,
-                    target as Record<
-                        string,
-                        TTypes[T] extends Rpc<infer S>
-                            ? z.infer<S>
-                            : never | null
-                    >,
-                    idFieldMap
-                );
-                this.emitDataChangedEvent({
-                    type,
-                    payload: this.findAll(type),
-                });
+                const storageType = this.getStorageType(type as string);
+
+                if (storageType === "singleton") {
+                    const existing = this.findAll(type);
+
+                    const merged = {
+                        ...(existing[0] as any),
+                        ...(target as any),
+                    };
+                    this.save(type, merged);
+                    result = this.findAll(type);
+
+                    this.emitDataChangedEvent({
+                        type,
+                        payload: merged,
+                    });
+                } else {
+                    result = this.mergeArrayDeep(
+                        type,
+                        target as Record<
+                            string,
+                            TTypes[T] extends Rpc<infer S>
+                                ? z.infer<S>
+                                : never | null
+                        >,
+                        idFieldMap
+                    );
+                    this.emitDataChangedEvent({
+                        type,
+                        payload: this.findAll(type),
+                    });
+                }
             } else {
                 const storageType = this.getStorageType(type as string);
                 if (storageType === "singleton") {

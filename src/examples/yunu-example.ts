@@ -399,14 +399,18 @@ type SingletonTypeKeys = SingletonKeys<RpcStorageType>; // "settings" | "error"
 
 setTimeout(() => {
     rpcRepository.mergeRpc("settings", null);
+    rpcRepository.mergeRpc("error", {
+        code: "AUTHENTICATION_ERROR",
+        msg: "Authentication error",
+    });
 }, 3000);
 
-rpcRepository.onDataChanged<RpcStorageType, ["settings"]>(
+rpcRepository.onDataChanged<RpcStorageType, ["settings", "error"]>(
     (events) => {
         console.log(events);
     },
     {
-        types: ["settings"],
+        types: ["settings", "error"],
     }
 );
 
