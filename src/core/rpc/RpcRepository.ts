@@ -106,7 +106,7 @@ export class RpcRepository<
             typeData.clear();
             typeData.set("singleton", validatedData);
         } else {
-            const id = String(data[foreignKey]);
+            const id = String((data as any)[foreignKey]);
             typeData.set(id, validatedData);
         }
 
@@ -132,6 +132,10 @@ export class RpcRepository<
             | Array<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never>
             | Partial<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never>
     ): Array<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never>;
+    public mergeRpc<T extends keyof TTypes>(
+        type: T,
+        target: null
+    ): Array<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never>;
     public mergeRpc<
         T extends keyof TTypes,
         RpcStorageType extends Record<keyof TTypes, StorageType>
@@ -147,7 +151,9 @@ export class RpcRepository<
                     >
                   | Array<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never>
             : RpcStorageType[T] extends "singleton"
-            ? Partial<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never>
+            ? Partial<
+                  TTypes[T] extends Rpc<infer S> ? z.infer<S> : never
+              > | null
             : never
     ): Array<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never>;
     public mergeRpc<
@@ -167,10 +173,26 @@ export class RpcRepository<
               >
             | Array<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never>
             | Partial<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never>
+            | null
     ): Array<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never> {
         const source = this.findAll(type);
         const rpc = this.getRpc(type);
         const mergePath = rpc.getMergePath();
+
+        if (target === null) {
+            const storageType = this.getStorageType(type as string);
+            if (storageType === "singleton") {
+                const typeData = this.data.get(type as string) || new Map();
+                typeData.clear();
+                this.data.set(type as string, typeData);
+                this.emitDataChangedEvent({
+                    type,
+                    payload: null as any,
+                });
+                return [] as any;
+            }
+            return this.findAll(type);
+        }
 
         const idFieldMap: IdFieldMap = {};
         for (const [path, idField] of Object.entries(mergePath)) {
@@ -208,16 +230,18 @@ export class RpcRepository<
                 const storageType = this.getStorageType(type as string);
                 if (storageType === "singleton") {
                     const existing = this.findAll(type);
-                    const merged =
-                        existing.length > 0
-                            ? { ...(existing[0] as any), ...(target as any) }
-                            : target;
-                    this.save(type, merged as any);
+
+                    const merged = {
+                        ...(existing[0] as any),
+                        ...(target as any),
+                    };
+
+                    this.save(type, merged);
                     result = this.findAll(type);
 
                     this.emitDataChangedEvent({
                         type,
-                        payload: existing.length > 0 ? existing[0] : merged,
+                        payload: merged,
                     });
                 } else {
                     result = source;

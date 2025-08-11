@@ -265,13 +265,25 @@ export type MessageWithStorageType<
                   > | null
               > | Array<TTypes[K] extends Rpc<infer S> ? z.infer<S> : never>
             : TStorageType[K] extends "singleton"
-            ? Partial<TTypes[K] extends Rpc<infer S> ? z.infer<S> : never>
+            ? Partial<TTypes[K] extends Rpc<infer S> ? z.infer<S> : never> | null
             : never;
     };
 }[keyof TTypes];
 
-export type DataChangeEvent<TTypes extends Record<string, Rpc<any>>> =
-    Message<TTypes>;
+export type DataChangeEvent<TTypes extends Record<string, Rpc<any>>> = {
+    [K in keyof TTypes]: {
+        type: K;
+        payload:
+            | Record<
+                  string,
+                  Partial<
+                      TTypes[K] extends Rpc<infer S> ? z.infer<S> : never
+                  > | null
+              >
+            | Array<TTypes[K] extends Rpc<infer S> ? z.infer<S> : never>
+            | null;
+    };
+}[keyof TTypes];
 
 export type DataChangeListener<
     TTypes extends Record<string, Rpc<any>>,
@@ -282,7 +294,7 @@ export type DataChangeListener<
         type: TKeys;
         payload: TKeys extends keyof TStorageMap 
             ? TStorageMap[TKeys] extends "singleton" 
-                ? TTypes[TKeys] extends Rpc<infer S> ? z.infer<S> : never
+                ? TTypes[TKeys] extends Rpc<infer S> ? z.infer<S> : never | null
                 : Array<TTypes[TKeys] extends Rpc<infer S> ? z.infer<S> : never>
             : Array<TTypes[TKeys] extends Rpc<infer S> ? z.infer<S> : never>;
     }>

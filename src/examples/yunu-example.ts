@@ -398,16 +398,21 @@ type CollectionTypeKeys = CollectionKeys<RpcStorageType>; // "cell" | "product" 
 type SingletonTypeKeys = SingletonKeys<RpcStorageType>; // "settings" | "error"
 
 setTimeout(() => {
-    rpcRepository.mergeRpc("cell", {
-        1: null,
-    });
+    rpcRepository.mergeRpc("settings", null);
 }, 3000);
 
-rpcRepository.onDataChanged<RpcStorageType, ["cell"]>(
+rpcRepository.onDataChanged<RpcStorageType, ["settings"]>(
     (events) => {
         console.log(events);
     },
     {
-        types: ["cell"],
+        types: ["settings"],
     }
 );
+
+rpcRepository.mergeRpc("settings", {
+    id: 123,
+    language: "en",
+    notifications: false,
+    theme: "light",
+});
