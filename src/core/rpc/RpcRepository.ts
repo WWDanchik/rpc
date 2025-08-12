@@ -86,6 +86,10 @@ export class RpcRepository<
         return state;
     }
 
+    public clear<T extends keyof TTypes>(type: T) {
+        this.data.set(type as string, new Map());
+        this.emitDataChangedEvent({ type, payload: this.findAll(type) });
+    }
     public save<T extends keyof TTypes>(
         type: T,
         data: Partial<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never>
