@@ -357,6 +357,100 @@ describe('RpcRepository', () => {
     })
   })
 
+  describe('mergeRpc with nested arrays (cell)', () => {
+    const cellSchema = z.object({
+      id: z.number(),
+      name: z.string(),
+      type: z.enum(['shelf', 'pallet', 'box', 'loss']),
+      is_stretched: z.boolean(),
+      parent_cell_id: z.number().nullable(),
+      code: z.string(),
+      warehouse_id: z.number(),
+      children: z.array(z.object({ id: z.number() })),
+      products: z.array(
+        z.object({
+          id: z.number(),
+          barcodes: z.array(z.object({ id: z.number() })),
+        })
+      ),
+    })
+
+    const cellRpc = new Rpc('cell', cellSchema, 'id')
+
+    beforeEach(() => {
+      repository.registerRpc('cell', cellRpc)
+
+      repository.save('cell', {
+        id: 1,
+        name: 'Cell A',
+        type: 'shelf',
+        is_stretched: false,
+        parent_cell_id: null,
+        code: 'A-1',
+        warehouse_id: 100,
+        children: [{ id: 10 }, { id: 11 }],
+        products: [
+          { id: 1, barcodes: [{ id: 1 }, { id: 2 }] },
+          { id: 2, barcodes: [{ id: 5 }] },
+        ],
+      })
+    })
+
+    it('deletes nested barcode via null at barcodes level', () => {
+      repository.mergeRpc('cell', {
+        '1': { products: { '1': { barcodes: { '1': null } } } },
+      })
+
+      const cell = repository.findById('cell', 1) as any
+      const p1 = cell.products.find((p: any) => p.id === 1)
+      expect(p1.barcodes.find((b: any) => b.id === 1)).toBeUndefined()
+      expect(p1.barcodes.find((b: any) => b.id === 2)).toBeTruthy()
+    })
+
+    it('adds nested barcode when provided with numeric id key', () => {
+      repository.mergeRpc('cell', {
+        '1': { products: { '1': { barcodes: { '3': { id: 3 } } } } },
+      })
+
+      const cell = repository.findById('cell', 1) as any
+      const p1 = cell.products.find((p: any) => p.id === 1)
+      const ids = p1.barcodes.map((b: any) => b.id).sort()
+      expect(ids).toEqual([1, 2, 3])
+    })
+
+    it('deletes nested product via null at products level', () => {
+      repository.mergeRpc('cell', {
+        '1': { products: { '1': null } },
+      })
+
+      const cell = repository.findById('cell', 1) as any
+      const ids = cell.products.map((p: any) => p.id).sort()
+      expect(ids).toEqual([2])
+    })
+
+    it('deletes child via null at children level', () => {
+      repository.mergeRpc('cell', {
+        '1': { children: { '10': null } },
+      })
+
+      const cell = repository.findById('cell', 1) as any
+      const ids = cell.children.map((c: any) => c.id).sort()
+      expect(ids).toEqual([11])
+    })
+
+    it('updates top-level field together with nested change', () => {
+      repository.mergeRpc('cell', {
+        '1': { name: 'Cell A Updated', products: { '2': { barcodes: { '6': { id: 6 } } } } },
+      })
+
+      const cell = repository.findById('cell', 1) as any
+      expect(cell.name).toBe('Cell A Updated')
+      const p2 = cell.products.find((p: any) => p.id === 2)
+      const ids = p2.barcodes.map((b: any) => b.id).sort()
+      expect(ids).toEqual([5, 6])
+    })
+  })
+
   describe('getStats', () => {
     it('should return stats', () => {
       repository.save('user', { id: 1, name: 'John', email: 'john@example.com' })

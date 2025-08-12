@@ -225,7 +225,10 @@ export class RpcRepository<
                         ...(existing[0] as any),
                         ...(target as any),
                     };
-                    this.save(type, merged);
+                    const typeData = this.data.get(type as string) || new Map();
+                    typeData.clear();
+                    typeData.set("singleton", merged as any);
+                    this.data.set(type as string, typeData);
                     result = this.findAll(type);
 
                     this.emitDataChangedEvent({
@@ -258,7 +261,10 @@ export class RpcRepository<
                         ...(target as any),
                     };
 
-                    this.save(type, merged);
+                    const typeData = this.data.get(type as string) || new Map();
+                    typeData.clear();
+                    typeData.set("singleton", merged as any);
+                    this.data.set(type as string, typeData);
                     result = this.findAll(type);
 
                     this.emitDataChangedEvent({
@@ -919,32 +925,19 @@ export class RpcRepository<
             }
         }
 
-        const typeData = this.data.get(type as string) || new Map();
-
+        const typeData = new Map<string, any>();
+        const rpc = this.getRpc(type);
+        const foreignKey =
+            rpc.getForeignKey() as keyof (TTypes[T] extends Rpc<infer S>
+                ? z.infer<S>
+                : never);
         for (const item of result) {
-            const rpc = this.getRpc(type);
-            const foreignKey =
-                rpc.getForeignKey() as keyof (TTypes[T] extends Rpc<infer S>
-                    ? z.infer<S>
-                    : never);
             const id = item[foreignKey];
             if (id !== undefined) {
-                this.save(type, item);
+                typeData.set(String(id), item as any);
             }
         }
-
-        const existingIds = new Set(Array.from(typeData.keys()));
-        const resultIds = new Set(
-            result.map((item: any) =>
-                String(item[this.getIdFieldForPath(idFieldMap, "", "") || "id"])
-            )
-        );
-
-        for (const id of existingIds) {
-            if (!resultIds.has(id)) {
-                typeData.delete(id);
-            }
-        }
+        this.data.set(type as string, typeData);
 
         return result;
     }
