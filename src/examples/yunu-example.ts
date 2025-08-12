@@ -13,7 +13,22 @@ const cellSchema = z.object({
         })
     ),
 });
-
+export const cellTestSchema = z.object({
+    id: z.number(),
+    name: z.string(),
+    type: z.enum(["shelf", "pallet", "box", "loss"]),
+    is_stretched: z.boolean(),
+    parent_cell_id: z.number().nullable(),
+    code: z.string(),
+    warehouse_id: z.number(),
+    children: z.array(z.object({ id: z.number() })),
+    products: z.array(
+        z.object({
+            id: z.number(),
+            barcodes: z.array(z.object({ id: z.number() })),
+        })
+    ),
+});
 const rectangleSchema = z.object({
     id: z.number(),
     cell_ids: z.array(
@@ -80,14 +95,19 @@ const errorSchema = z.object({
 const settingsRpc = new Rpc("settings", settingsSchema);
 const errorRpc = new Rpc("error", errorSchema);
 const barcodeCodeRpc = new Rpc("barcode_code", barcodeCodeSchema);
-
+const cellTestRpc = new Rpc("cell_test", cellTestSchema, "id").setMergePath({
+    products: "id",
+    "products.barcodes": "id",
+    children: "id",
+});
 const rpcRepository = new RpcRepository()
     .registerRpc("cell", cellRpc, { storageType: "collection" })
     .registerRpc("product", productRpc, { storageType: "collection" })
     .registerRpc("rectangle", rectangleRpc, { storageType: "collection" })
     .registerRpc("settings", settingsRpc, { storageType: "singleton" })
     .registerRpc("error", errorRpc, { storageType: "singleton" })
-    .registerRpc("barcode_code", barcodeCodeRpc, { storageType: "singleton" });
+    .registerRpc("barcode_code", barcodeCodeRpc, { storageType: "singleton" })
+    .registerRpc("cell_test", cellTestRpc, { storageType: "collection" });
 
 rpcRepository.defineRelation("rectangle", "cell", "cells").hasMany(
     {
@@ -390,6 +410,7 @@ const RpcStorageType = createRpcStorageType({
     settings: "singleton",
     error: "singleton",
     barcode_code: "singleton",
+    cell_test: "collection",
 } as const);
 
 type RpcStorageType = typeof RpcStorageType;
@@ -410,12 +431,12 @@ setTimeout(() => {
     });
 }, 3000);
 
-rpcRepository.onDataChanged<RpcStorageType, ["barcode_code"]>(
+rpcRepository.onDataChanged<RpcStorageType, ["cell_test"]>(
     (events) => {
         console.log(events);
     },
     {
-        types: ["barcode_code"],
+        types: ["cell_test"],
     }
 );
 
@@ -1809,3 +1830,28 @@ const message: MessageWithStorageType<
 ];
 
 rpcRepository.handleMessages(message);
+
+setTimeout(() => {
+    //@ts-ignore
+    rpcRepository.mergeRpc("cell_test", {
+        "1": {
+            code: "A-1",
+            children: [],
+            id: 1,
+            is_stretched: false,
+            name: "Cell A",
+            parent_cell_id: null,
+            type: "shelf",
+            warehouse_id: 100,
+            products: {
+                10: {
+                    barcodes: {
+                        30: {
+                            id: 30,
+                        },
+                    },
+                },
+            },
+        },
+    });
+}, 3000);

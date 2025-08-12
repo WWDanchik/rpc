@@ -652,6 +652,18 @@ export class RpcRepository<
                 ? directMatch
                 : directMatch.idField;
         }
+        const collapsedPath = path
+            .split(".")
+            .filter((seg) => isNaN(Number(seg)))
+            .join(".");
+        if (collapsedPath && collapsedPath !== path) {
+            const collapsedMatch = idFieldMap[collapsedPath];
+            if (collapsedMatch) {
+                return typeof collapsedMatch === "string"
+                    ? collapsedMatch
+                    : collapsedMatch.idField;
+            }
+        }
 
         if (rootPath) {
             const fullPath = `${rootPath}.${path}`;
@@ -661,13 +673,22 @@ export class RpcRepository<
                     ? fullPathMatch
                     : fullPathMatch.idField;
             }
+            if (collapsedPath && collapsedPath !== path) {
+                const collapsedFullPath = `${rootPath}.${collapsedPath}`;
+                const collapsedFullMatch = idFieldMap[collapsedFullPath];
+                if (collapsedFullMatch) {
+                    return typeof collapsedFullMatch === "string"
+                        ? collapsedFullMatch
+                        : collapsedFullMatch.idField;
+                }
+            }
 
             for (const [key, value] of Object.entries(idFieldMap)) {
                 const keyWithoutRoot = key.startsWith(`${rootPath}.`)
                     ? key.substring(`${rootPath}.`.length)
                     : key;
 
-                if (keyWithoutRoot === path) {
+                if (keyWithoutRoot === path || keyWithoutRoot === collapsedPath) {
                     return typeof value === "string" ? value : value.idField;
                 }
             }
@@ -783,15 +804,23 @@ export class RpcRepository<
                             (key) => !isNaN(Number(key))
                         )
                     ) {
-                        if (Array.isArray(result[key])) {
-                            const arrayIdField =
-                                this.getIdFieldForPath(
-                                    idFieldMap,
-                                    newPath,
-                                    rootPath
-                                ) || idField;
+                        const arrayIdField =
+                            this.getIdFieldForPath(
+                                idFieldMap,
+                                newPath,
+                                rootPath
+                            ) || idField;
+                        const isDeclaredArrayPath =
+                            this.getIdFieldForPath(
+                                idFieldMap,
+                                newPath,
+                                rootPath
+                            ) !== undefined;
 
-                            const newArray = [...result[key]];
+                        if (Array.isArray(result[key]) || isDeclaredArrayPath) {
+                            const newArray = Array.isArray(result[key])
+                                ? [...result[key]]
+                                : [];
 
                             for (const numKey in sourceVal) {
                                 if (
@@ -822,8 +851,15 @@ export class RpcRepository<
                                             rootPath
                                         );
                                     } else {
+                                        const mergedNew = this.mergeDeep(
+                                            {},
+                                            sourceVal[numKey],
+                                            idFieldMap,
+                                            `${newPath}.${numKey}`,
+                                            rootPath
+                                        );
                                         const newItem = {
-                                            ...sourceVal[numKey],
+                                            ...mergedNew,
                                             [arrayIdField]: numericId,
                                         };
                                         newArray.unshift(newItem);
@@ -918,8 +954,15 @@ export class RpcRepository<
                         : item
                 );
             } else if (updatedItem !== null) {
+                const normalizedItem = this.mergeDeep(
+                    {},
+                    updatedItem as any,
+                    idFieldMap,
+                    "",
+                    ""
+                );
                 result = [
-                    { ...updatedItem, [mainIdField]: numericItemId } as any,
+                    { ...normalizedItem, [mainIdField]: numericItemId } as any,
                     ...result,
                 ];
             }

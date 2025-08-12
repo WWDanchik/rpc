@@ -55,6 +55,11 @@ export class Rpc<TSchema extends z.ZodSchema = z.ZodSchema> {
         return this.mergePath;
     }
 
+    public setMergePath(mergePath: Record<string, string>): this {
+        this.mergePath = { ...mergePath };
+        return this;
+    }
+
     public createMessage(
         data: Record<string, Partial<ZodSchemaType<TSchema>> | null>
     ): {

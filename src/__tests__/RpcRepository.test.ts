@@ -375,7 +375,11 @@ describe('RpcRepository', () => {
       ),
     })
 
-    const cellRpc = new Rpc('cell', cellSchema, 'id')
+    const cellRpc = new Rpc('cell', cellSchema, 'id').setMergePath({
+      products: 'id',
+      'products.barcodes': 'id',
+      children: 'id',
+    })
 
     beforeEach(() => {
       repository.registerRpc('cell', cellRpc)
@@ -416,6 +420,34 @@ describe('RpcRepository', () => {
       const p1 = cell.products.find((p: any) => p.id === 1)
       const ids = p1.barcodes.map((b: any) => b.id).sort()
       expect(ids).toEqual([1, 2, 3])
+    })
+
+    it('creates nested arrays from numeric-keyed objects using mergePath (products, barcodes)', () => {
+      // products[10] with barcodes[30] should be created even if not present before
+      repository.mergeRpc('cell', {
+        '1': {
+          code: 'A-1',
+          children: [],
+          id: 1,
+          is_stretched: false,
+          name: 'Cell A',
+          parent_cell_id: null,
+          type: 'shelf',
+          warehouse_id: 100,
+          products: {
+            '10': {
+              barcodes: {
+                '30': { id: 30 },
+              },
+            },
+          },
+        },
+      })
+
+      const cell = repository.findById('cell', 1) as any
+      const p10 = cell.products.find((p: any) => p.id === 10)
+      expect(p10).toBeTruthy()
+      expect(p10.barcodes.find((b: any) => b.id === 30)).toBeTruthy()
     })
 
     it('deletes nested product via null at products level', () => {
