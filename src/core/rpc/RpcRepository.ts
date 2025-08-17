@@ -211,6 +211,10 @@ export class RpcRepository<
                 this.arrayToRecord(type, target),
                 idFieldMap
             );
+            this.emitDataChangedEvent({
+                type,
+                payload: this.findAll(type),
+            });
         } else if (typeof target === "object" && target !== null) {
             const keys = Object.keys(target);
             const hasNumericKeys = keys.every((key) => !isNaN(Number(key)));

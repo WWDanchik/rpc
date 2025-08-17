@@ -1832,26 +1832,25 @@ const message: MessageWithStorageType<
 rpcRepository.handleMessages(message);
 
 setTimeout(() => {
+    console.log("adsd");
+
     //@ts-ignore
-    rpcRepository.mergeRpc("cell_test", {
-        "1": {
+    rpcRepository.mergeRpc("cell_test", [
+        {
             code: "A-1",
             children: [],
-            id: 1,
+            id: 10,
             is_stretched: false,
             name: "Cell A",
             parent_cell_id: null,
             type: "shelf",
             warehouse_id: 100,
-            products: {
-                10: {
-                    barcodes: {
-                        30: {
-                            id: 30,
-                        },
-                    },
+            products: [
+                {
+                    id: 15,
+                    barcodes: [{ id: 10 }],
                 },
-            },
+            ],
         },
-    });
-}, 3000);
+    ]);
+}, 2000);
