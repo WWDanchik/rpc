@@ -431,15 +431,6 @@ setTimeout(() => {
     });
 }, 3000);
 
-rpcRepository.onDataChanged<RpcStorageType, ["cell_test"]>(
-    (events) => {
-        console.log(events);
-    },
-    {
-        types: ["cell_test"],
-    }
-);
-
 const testBarcodes = {
     "0000007959028": {
         id: 795902,
@@ -1837,20 +1828,122 @@ setTimeout(() => {
     //@ts-ignore
     rpcRepository.mergeRpc("cell_test", [
         {
-            code: "A-1",
-            children: [],
-            id: 10,
-            is_stretched: false,
-            name: "Cell A",
-            parent_cell_id: null,
-            type: "shelf",
-            warehouse_id: 100,
-            products: [
+            type: "cell_test",
+            payload: [
                 {
-                    id: 15,
-                    barcodes: [{ id: 10 }],
+                    code: "A-1",
+                    children: [],
+                    id: 22,
+                    is_stretched: false,
+                    name: "Cell A",
+                    parent_cell_id: null,
+                    type: "shelf",
+                    warehouse_id: 100,
+                    products: [
+                        {
+                            id: 15,
+                            barcodes: [{ id: 10 }],
+                        },
+                    ],
+                },
+                {
+                    code: "A-1",
+                    children: [],
+                    id: 10,
+                    is_stretched: false,
+                    name: "Cell A",
+                    parent_cell_id: null,
+                    type: "shelf",
+                    warehouse_id: 100,
+                    products: [
+                        {
+                            id: 15,
+                            barcodes: [{ id: 10 }],
+                        },
+                    ],
+                },
+                {
+                    code: "A-1",
+                    children: [],
+                    id: 13213120,
+                    is_stretched: false,
+                    name: "Cell A",
+                    parent_cell_id: null,
+                    type: "shelf",
+                    warehouse_id: 100,
+                    products: [
+                        {
+                            id: 15,
+                            barcodes: [{ id: 10 }],
+                        },
+                    ],
                 },
             ],
         },
     ]);
 }, 2000);
+
+rpcRepository.handleMessages([
+    {
+        type: "cell_test",
+        payload: [
+            {
+                code: "A-1",
+                children: [],
+                id: 22,
+                is_stretched: false,
+                name: "Cell A",
+                parent_cell_id: null,
+                type: "shelf",
+                warehouse_id: 100,
+                products: [
+                    {
+                        id: 15,
+                        barcodes: [{ id: 10 }],
+                    },
+                ],
+            },
+            {
+                code: "A-1",
+                children: [],
+                id: 10,
+                is_stretched: false,
+                name: "Cell A",
+                parent_cell_id: null,
+                type: "shelf",
+                warehouse_id: 100,
+                products: [
+                    {
+                        id: 15,
+                        barcodes: [{ id: 10 }],
+                    },
+                ],
+            },
+            {
+                code: "A-1",
+                children: [],
+                id: 13213120,
+                is_stretched: false,
+                name: "Cell A",
+                parent_cell_id: null,
+                type: "shelf",
+                warehouse_id: 100,
+                products: [
+                    {
+                        id: 15,
+                        barcodes: [{ id: 10 }],
+                    },
+                ],
+            },
+        ],
+    },
+]);
+
+rpcRepository.onDataChanged<RpcStorageType, ["cell_test"]>(
+    (events) => {
+        console.log(events);
+    },
+    {
+        types: ["cell_test"],
+    }
+);

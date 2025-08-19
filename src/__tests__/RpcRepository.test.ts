@@ -336,6 +336,22 @@ describe('RpcRepository', () => {
       expect(bob?.name).toBe('Bob')
       expect(alice?.name).toBe('Alice')
     })
+
+    it('should preserve array input order when merging array payload', () => {
+      repository.save('user', { id: 2, name: 'Jane', email: 'jane@example.com' })
+      repository.save('user', { id: 10, name: 'X', email: 'x@example.com' })
+      repository.save('user', { id: 13213120, name: 'Y', email: 'y@example.com' })
+
+      const merged = repository.mergeRpc('user', [
+        { id: 22, name: 'A', email: 'a@example.com' },
+        { id: 10, name: 'B', email: 'b@example.com' },
+        { id: 13213120, name: 'C', email: 'c@example.com' },
+      ])
+
+      const ids = merged.map((u: any) => u.id)
+      const subsetInOrder = ids.slice(0, 3)
+      expect(subsetInOrder).toEqual([22, 10, 13213120])
+    })
   })
 
   describe('handleMessages', () => {

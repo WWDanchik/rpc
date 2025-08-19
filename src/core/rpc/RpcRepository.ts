@@ -206,10 +206,18 @@ export class RpcRepository<
         let result: Array<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never>;
 
         if (Array.isArray(target)) {
+            const rpcForOrder = this.getRpc(type);
+            const foreignKeyForOrder = rpcForOrder.getForeignKey() as keyof (TTypes[T] extends Rpc<infer S> ? z.infer<S> : never);
+            const originalOrder: number[] = target
+                .map((item: any) => item[foreignKeyForOrder])
+                .filter((id: any) => id !== undefined)
+                .map((id: any) => Number(id));
+
             result = this.mergeArrayDeep(
                 type,
                 this.arrayToRecord(type, target),
-                idFieldMap
+                idFieldMap,
+                originalOrder
             );
             this.emitDataChangedEvent({
                 type,
@@ -932,7 +940,8 @@ export class RpcRepository<
             string,
             TTypes[T] extends Rpc<infer S> ? z.infer<S> : never | null
         >,
-        idFieldMap: IdFieldMap = {}
+        idFieldMap: IdFieldMap = {},
+        originalOrder?: number[]
     ): Array<TTypes[T] extends Rpc<infer S> ? z.infer<S> : never> {
         const existing = this.findAll(type);
         let result = [...existing];
@@ -970,6 +979,17 @@ export class RpcRepository<
                     ...result,
                 ];
             }
+        }
+
+        if (originalOrder && originalOrder.length > 0) {
+            const specifiedIds = new Set(originalOrder.map((n) => Number(n)));
+            const orderedPrefix: any[] = [];
+            for (const id of originalOrder) {
+                const found = result.find((item: any) => item[mainIdField] === Number(id));
+                if (found) orderedPrefix.push(found);
+            }
+            const rest = result.filter((item: any) => !specifiedIds.has(Number(item[mainIdField])));
+            result = [...orderedPrefix, ...rest];
         }
 
         const typeData = new Map<string, any>();
