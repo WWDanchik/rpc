@@ -483,6 +483,73 @@ describe('RpcRepository', () => {
     })
   })
 
+  describe('mergeRpc with recursive children', () => {
+    const treeSchema = z.object({
+      id: z.number(),
+      name: z.string(),
+      children: z.array(z.object({ id: z.number(), name: z.string(), children: z.array(z.any()).optional() })).optional(),
+    })
+
+    const treeRpc = new Rpc('tree', treeSchema, 'id').setMergePath({
+      // Declare a recursive children path: at any nesting level, arrays under children use id field
+      'children': { idField: 'id', children: 'children', recursive: true },
+    })
+
+    beforeEach(() => {
+      repository.registerRpc('tree', treeRpc)
+
+      repository.save('tree', {
+        id: 1,
+        name: 'root',
+        children: [
+          { id: 10, name: 'A', children: [ { id: 100, name: 'A-1' } ] },
+          { id: 11, name: 'B' },
+        ],
+      })
+    })
+
+    it('adds a deep child using numeric-keyed object at nested path', () => {
+      repository.mergeRpc('tree', {
+        '1': {
+          children: {
+            '10': {
+              children: {
+                '101': { id: 101, name: 'A-2' },
+              },
+            },
+          },
+        },
+      })
+
+      const tree = repository.findById('tree', 1) as any
+      const a = tree.children.find((c: any) => c.id === 10)
+      const ids = a.children.map((c: any) => c.id).sort()
+      expect(ids).toEqual([100, 101])
+    })
+
+    it('updates a deep child and deletes a sibling using null at nested level', () => {
+      repository.mergeRpc('tree', {
+        '1': {
+          children: {
+            '10': {
+              children: {
+                '100': { name: 'A-1 updated' },
+              },
+            },
+            '11': null,
+          },
+        },
+      })
+
+      const tree = repository.findById('tree', 1) as any
+      const a = tree.children.find((c: any) => c.id === 10)
+      const a1 = a.children.find((c: any) => c.id === 100)
+      expect(a1.name).toBe('A-1 updated')
+      const b = tree.children.find((c: any) => c.id === 11)
+      expect(b).toBeUndefined()
+    })
+  })
+
   describe('getStats', () => {
     it('should return stats', () => {
       repository.save('user', { id: 1, name: 'John', email: 'john@example.com' })

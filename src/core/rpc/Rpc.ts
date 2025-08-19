@@ -1,6 +1,6 @@
 import z from "zod";
 import { EventEmitter, Events } from "../event/EventEmitter";
-import { TypedRpcRelation, ZodSchemaKeys, ZodSchemaType } from "../types";
+import { TypedRpcRelation, ZodSchemaKeys, ZodSchemaType, IdFieldMap } from "../types";
 
 export class Rpc<TSchema extends z.ZodSchema = z.ZodSchema> {
     private type: string;
@@ -8,7 +8,7 @@ export class Rpc<TSchema extends z.ZodSchema = z.ZodSchema> {
     private emitter: EventEmitter;
     private relations = new Map<string, TypedRpcRelation<TSchema, any>>();
     private foreignKey: ZodSchemaKeys<TSchema>;
-    private mergePath: Record<string, string>;
+    private mergePath: IdFieldMap;
     private relatedFields: Record<string, string>;
 
     constructor(
@@ -51,11 +51,11 @@ export class Rpc<TSchema extends z.ZodSchema = z.ZodSchema> {
         return this;
     }
 
-    public getMergePath(): Record<string, string> {
+    public getMergePath(): IdFieldMap {
         return this.mergePath;
     }
 
-    public setMergePath(mergePath: Record<string, string>): this {
+    public setMergePath(mergePath: IdFieldMap): this {
         this.mergePath = { ...mergePath };
         return this;
     }
